@@ -293,18 +293,23 @@ export default function OutlawsTracker() {
   useEffect(() => {
     const fetchRows = async () => {
       const { data, error } = await supabase.from("fleet").select("*").order("line", { ascending: true });
-      if (!error && data) setRows(data);
-      setLoading(false);
+      if (!error && data) { setRows(data); setLoading(false); }
     };
     fetchRows();
 
-    const channel = supabase.channel("fleet-changes")
-      .on("postgres_changes", { event: "*", schema: "public", table: "fleet" }, (payload) => {
-        if (payload.eventType === "UPDATE") setRows(prev => prev.map(r => r.id === payload.new.id ? payload.new : r));
+    // Realtime — fires instantly when anyone edits
+    const channel = supabase.channel("fleet-realtime", { config: { broadcast: { self: false } } })
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "fleet" }, (payload) => {
+        setRows(prev => prev.map(r => r.id === payload.new.id ? payload.new : r));
       })
-      .subscribe();
+      .subscribe((status) => {
+        console.log("Realtime:", status);
+      });
 
-    return () => { supabase.removeChannel(channel); };
+    // Safety net — poll every 4 seconds in case realtime drops
+    const poll = setInterval(fetchRows, 4000);
+
+    return () => { supabase.removeChannel(channel); clearInterval(poll); };
   }, []);
 
   const handleUpdate = useCallback(async (id, changes) => {
