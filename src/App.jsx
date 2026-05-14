@@ -74,7 +74,7 @@ function MobileCard({ row, onUpdate, username }) {
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
         <span style={{ color: "#3a6a3a", fontSize: 11, fontFamily: "monospace", minWidth: 20 }}>{row.line}</span>
         <span style={{ color: sc.text, fontWeight: 900, fontSize: 16, fontFamily: "monospace", letterSpacing: 1 }}>{row.unit}</span>
-        <span style={{ color: "#4a7a4a", fontSize: 10, fontFamily: "monospace", background: "#0f1f0f", padding: "2px 8px", borderRadius: 4 }}>{row.type}</span>
+        <span style={{ color: row.type === "MATV" ? "#ff9900" : row.type === "LMTV" ? "#cc44ff" : "#4a7a4a", fontSize: 10, fontFamily: "monospace", background: "#0f1f0f", padding: "2px 8px", borderRadius: 4, fontWeight: row.type === "MATV" || row.type === "LMTV" ? 700 : 400 }}>{row.type}</span>
         <div style={{ marginLeft: "auto" }} onClick={() => setEditing("status")}>
           <StatusBadge status={localStatus} />
         </div>
@@ -163,7 +163,7 @@ function DesktopRow({ row, onUpdate, username }) {
     <div style={{ display: "grid", gridTemplateColumns: "36px 80px 72px 72px 130px 80px 1fr 148px 120px", alignItems: "center", borderBottom: `1px solid ${isNMC ? "#3a1010" : "#1a2a1a"}`, background: isNMC ? "rgba(255,40,40,0.06)" : "transparent", minHeight: 42 }}>
       <div style={{ ...cell, textAlign: "center", color: "#3a6a3a", fontSize: 11 }}>{row.line}</div>
       <div style={{ ...cell, color: sc.text, fontWeight: 700, fontSize: 13, letterSpacing: 1 }}>{row.unit}</div>
-      <div style={{ ...cell, color: "#4a7a4a", fontSize: 10 }}>{row.type}</div>
+      <div style={{ ...cell, color: row.type === "MATV" ? "#ff9900" : row.type === "LMTV" ? "#cc44ff" : "#4a7a4a", fontSize: 10, fontWeight: row.type === "MATV" || row.type === "LMTV" ? 700 : 400 }}>{row.type}</div>
       <div style={{ ...cell }}>
         {editing === "squad"
           ? <select autoFocus value={localSquad} onChange={e => { setLocalSquad(e.target.value); save("squad", e.target.value); setEditing(null); }} onBlur={() => setEditing(null)} style={selectStyle}>{SQUADS.map(s => <option key={s}>{s}</option>)}</select>
@@ -395,7 +395,7 @@ export default function OutlawsTracker() {
             <button key={s} onClick={() => setFilterStatus(s)} style={{ background: filterStatus === s ? (s === "FMC" ? "#00c44f" : s === "NMC" ? "#cc0000" : "#2a4a2a") : "#0a1a0a", color: filterStatus === s ? "#fff" : "#5a8a5a", border: "1px solid #2a4a2a", borderRadius: 4, padding: isMobile ? "6px 14px" : "5px 14px", fontFamily: "monospace", fontWeight: 700, fontSize: 12, letterSpacing: 2, cursor: "pointer" }}>{s}</button>
           ))}
           <div style={{ width: 1, background: "#1a3a1a", height: 22 }} />
-          {["ALL", "TRUCK", "TRAILER"].map(t => (
+          {["ALL", "TRUCK", "TRAILER", "MATV", "LMTV"].map(t => (
             <button key={t} onClick={() => setFilterType(t)} style={{ background: filterType === t ? "#1a3a1a" : "#0a1a0a", color: filterType === t ? "#88cc88" : "#4a6a4a", border: "1px solid #2a4a2a", borderRadius: 4, padding: isMobile ? "6px 10px" : "5px 12px", fontFamily: "monospace", fontSize: 11, cursor: "pointer" }}>{t}</button>
           ))}
           {isMobile && <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search..." style={{ ...inputStyle, flex: 1, minWidth: 80, fontSize: 12 }} />}
