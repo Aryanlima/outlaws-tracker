@@ -749,7 +749,7 @@ export default function OutlawsTracker() {
   );
 
   return (
-    <div style={{ minHeight: "100vh", background: "#050d05", color: "#88cc88", fontFamily: "monospace" }}>
+    <div style={{ minHeight: "100vh", background: "#050d05", color: "#88cc88", fontFamily: "monospace", overscrollBehavior: "none" }}>
 
       {/* NAME PROMPT — only for editors */}
       {showPrompt && !isViewer && (
@@ -853,5 +853,3 @@ export default function OutlawsTracker() {
     </div>
   );
 }
-
-
