@@ -105,7 +105,13 @@ function DesktopRow({ row, onUpdate, username, editingRowId }) {
   const [localSquad,    setLocalSquad]    = useState(row.squad);
   const faultsRef = useRef(null);
 
-  useEffect(() => { setLocalStatus(row.status); setLocalFaults(row.faults); setLocalLocation(row.location); setLocalSquad(row.squad); }, [row]);
+  useEffect(() => {
+    if (editing) return;
+    setLocalStatus(row.status); setLocalFaults(row.faults); setLocalLocation(row.location); setLocalSquad(row.squad);
+  }, [row, editing]);
+
+  const startEdit = (field) => { if (editingRowId) editingRowId.current = row.id; setEditing(field); };
+  const stopEdit  = () => { if (editingRowId) editingRowId.current = null; setEditing(null); };
 
   const sc = STATUS_CONFIG[localStatus] || STATUS_CONFIG.FMC;
   const isNMC = localStatus === "NMC";
@@ -120,7 +126,8 @@ function DesktopRow({ row, onUpdate, username, editingRowId }) {
 
   const handleStatus = (val) => {
     setLocalStatus(val); save("status", val);
-    if (val === "NMC") setTimeout(() => { setEditing("faults"); faultsRef.current?.focus(); }, 80);
+    if (val === "NMC") setTimeout(() => { startEdit("faults"); faultsRef.current?.focus(); }, 80);
+    else stopEdit();
   };
 
   return (
