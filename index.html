@@ -2,12 +2,26 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Outlaws Maintenance Tracker</title>
-    <style>* { margin: 0; padding: 0; box-sizing: border-box; }</style>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body {
+        background: #050d05;
+        overscroll-behavior: none;
+        -webkit-overflow-scrolling: touch;
+      }
+      /* Hide white bounce on iOS Safari */
+      body {
+        background-color: #050d05;
+        min-height: 100vh;
+        min-height: -webkit-fill-available;
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="./src/main.jsx"></script>
   </body>
 </html>
+ 
