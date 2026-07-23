@@ -30,7 +30,7 @@ function StatusBadge({ status }) {
 }
 
 // ── MOBILE CARD ───────────────────────────────────────────────────────────────
-function MobileCard({ row, onUpdate, username }) {
+function MobileCard({ row, onUpdate, username, editingRowId }) {
   const [editing, setEditing] = useState(null);
   const [localStatus,   setLocalStatus]   = useState(row.status);
   const [localFaults,   setLocalFaults]   = useState(row.faults);
@@ -38,7 +38,13 @@ function MobileCard({ row, onUpdate, username }) {
   const [localSquad,    setLocalSquad]    = useState(row.squad);
   const faultsRef = useRef(null);
 
-  useEffect(() => { setLocalStatus(row.status); setLocalFaults(row.faults); setLocalLocation(row.location); setLocalSquad(row.squad); }, [row]);
+  useEffect(() => {
+    if (editing) return; // don't sync while editing
+    setLocalStatus(row.status); setLocalFaults(row.faults); setLocalLocation(row.location); setLocalSquad(row.squad);
+  }, [row, editing]);
+
+  const startEdit = (field) => { if (editingRowId) editingRowId.current = row.id; setEditing(field); };
+  const stopEdit  = () => { if (editingRowId) editingRowId.current = null; setEditing(null); };
 
   const isNMC = localStatus === "NMC";
   const sc = STATUS_CONFIG[localStatus] || STATUS_CONFIG.FMC;
@@ -52,7 +58,8 @@ function MobileCard({ row, onUpdate, username }) {
 
   const handleStatus = (val) => {
     setLocalStatus(val); save("status", val);
-    if (val === "NMC") setTimeout(() => { setEditing("faults"); faultsRef.current?.focus(); }, 80);
+    if (val === "NMC") setTimeout(() => { startEdit("faults"); faultsRef.current?.focus(); }, 80);
+    else stopEdit();
   };
 
   return (
@@ -61,28 +68,28 @@ function MobileCard({ row, onUpdate, username }) {
         <span style={{ color: "#3a6a3a", fontSize: 11, fontFamily: "monospace", minWidth: 20 }}>{row.line}</span>
         <span style={{ color: sc.text, fontWeight: 900, fontSize: 16, fontFamily: "monospace", letterSpacing: 1 }}>{row.unit}</span>
         <span style={{ color: TYPE_COLOR[row.type] || "#4a7a4a", fontSize: 10, fontFamily: "monospace", background: "#0f1f0f", padding: "2px 8px", borderRadius: 4, fontWeight: 700 }}>{row.type}</span>
-        <div style={{ marginLeft: "auto" }} onClick={() => setEditing("status")}><StatusBadge status={localStatus} /></div>
+        <div style={{ marginLeft: "auto" }} onClick={() => startEdit("status")}><StatusBadge status={localStatus} /></div>
       </div>
-      {editing === "status" && <select autoFocus value={localStatus} onChange={e => { handleStatus(e.target.value); setEditing(null); }} onBlur={() => setEditing(null)} style={{ ...selectStyle, marginBottom: 10 }}>{STATUSES.map(s => <option key={s} value={s}>{s}</option>)}</select>}
+      {editing === "status" && <select autoFocus value={localStatus} onChange={e => { handleStatus(e.target.value); }} onBlur={() => stopEdit()} style={{ ...selectStyle, marginBottom: 10 }}>{STATUSES.map(s => <option key={s} value={s}>{s}</option>)}</select>}
       <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 9, color: "#3a6a3a", letterSpacing: 2, marginBottom: 4 }}>SQUAD</div>
           {editing === "squad"
-            ? <select autoFocus value={localSquad} onChange={e => { setLocalSquad(e.target.value); save("squad", e.target.value); setEditing(null); }} onBlur={() => setEditing(null)} style={selectStyle}>{SQUADS.map(s => <option key={s}>{s}</option>)}</select>
-            : <div onClick={() => setEditing("squad")} style={{ color: "#7aaa7a", fontFamily: "monospace", fontSize: 13, fontWeight: 700, cursor: "pointer", padding: "6px 8px", background: "#0a1a0a", borderRadius: 4, border: "1px solid #1a3a1a" }}>{localSquad}</div>}
+            ? <select autoFocus value={localSquad} onChange={e => { setLocalSquad(e.target.value); save("squad", e.target.value); stopEdit(); }} onBlur={() => stopEdit()} style={selectStyle}>{SQUADS.map(s => <option key={s}>{s}</option>)}</select>
+            : <div onClick={() => startEdit("squad")} style={{ color: "#7aaa7a", fontFamily: "monospace", fontSize: 13, fontWeight: 700, cursor: "pointer", padding: "6px 8px", background: "#0a1a0a", borderRadius: 4, border: "1px solid #1a3a1a" }}>{localSquad}</div>}
         </div>
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 9, color: "#3a6a3a", letterSpacing: 2, marginBottom: 4 }}>LOCATION</div>
           {editing === "location"
-            ? <select autoFocus value={localLocation} onChange={e => { setLocalLocation(e.target.value); save("location", e.target.value); setEditing(null); }} onBlur={() => setEditing(null)} style={selectStyle}>{LOCATIONS.map(l => <option key={l}>{l}</option>)}</select>
-            : <div onClick={() => setEditing("location")} style={{ color: locColor, fontFamily: "monospace", fontSize: 13, fontWeight: 700, cursor: "pointer", padding: "6px 8px", background: "#0a1a0a", borderRadius: 4, border: "1px solid #1a3a1a" }}>{localLocation}</div>}
+            ? <select autoFocus value={localLocation} onChange={e => { setLocalLocation(e.target.value); save("location", e.target.value); stopEdit(); }} onBlur={() => stopEdit()} style={selectStyle}>{LOCATIONS.map(l => <option key={l}>{l}</option>)}</select>
+            : <div onClick={() => startEdit("location")} style={{ color: locColor, fontFamily: "monospace", fontSize: 13, fontWeight: 700, cursor: "pointer", padding: "6px 8px", background: "#0a1a0a", borderRadius: 4, border: "1px solid #1a3a1a" }}>{localLocation}</div>}
         </div>
       </div>
       <div>
         <div style={{ fontSize: 9, color: "#3a6a3a", letterSpacing: 2, marginBottom: 4 }}>FAULTS / DETAILS</div>
         {editing === "faults"
-          ? <input ref={faultsRef} autoFocus value={localFaults} onChange={e => setLocalFaults(e.target.value)} onBlur={() => { save("faults", localFaults); setEditing(null); }} onKeyDown={e => { if (e.key === "Enter") { save("faults", localFaults); setEditing(null); } }} placeholder="Enter fault description..." style={{ ...inputStyle, color: isNMC ? "#ff8888" : "#88cc88", background: isNMC ? "#2a0a0a" : "#0a1a0a", padding: "8px 10px" }} />
-          : <div onClick={() => setEditing("faults")} style={{ color: isNMC ? "#ff6666" : "#3a6a3a", fontFamily: "monospace", fontSize: 12, cursor: "pointer", padding: "8px 10px", background: "#0a1a0a", borderRadius: 4, border: `1px solid ${isNMC ? "#4a1010" : "#1a2a1a"}`, fontStyle: localFaults ? "normal" : "italic", minHeight: 36 }}>{localFaults || (isNMC ? "Tap to add fault..." : "— No faults —")}</div>}
+          ? <input ref={faultsRef} autoFocus value={localFaults} onChange={e => setLocalFaults(e.target.value)} onBlur={() => { save("faults", localFaults); stopEdit(); }} onKeyDown={e => { if (e.key === "Enter") { save("faults", localFaults); stopEdit(); } }} placeholder="Enter fault description..." style={{ ...inputStyle, color: isNMC ? "#ff8888" : "#88cc88", background: isNMC ? "#2a0a0a" : "#0a1a0a", padding: "8px 10px" }} />
+          : <div onClick={() => startEdit("faults")} style={{ color: isNMC ? "#ff6666" : "#3a6a3a", fontFamily: "monospace", fontSize: 12, cursor: "pointer", padding: "8px 10px", background: "#0a1a0a", borderRadius: 4, border: `1px solid ${isNMC ? "#4a1010" : "#1a2a1a"}`, fontStyle: localFaults ? "normal" : "italic", minHeight: 36 }}>{localFaults || (isNMC ? "Tap to add fault..." : "— No faults —")}</div>}
       </div>
       {row.last_updated && <div style={{ marginTop: 8, fontSize: 10, color: "#2a5a2a", fontFamily: "monospace" }}>🕐 {row.last_updated} · {row.updated_by}</div>}
     </div>
@@ -90,7 +97,7 @@ function MobileCard({ row, onUpdate, username }) {
 }
 
 // ── DESKTOP ROW ───────────────────────────────────────────────────────────────
-function DesktopRow({ row, onUpdate, username }) {
+function DesktopRow({ row, onUpdate, username, editingRowId }) {
   const [editing, setEditing] = useState(null);
   const [localStatus,   setLocalStatus]   = useState(row.status);
   const [localFaults,   setLocalFaults]   = useState(row.faults);
@@ -122,20 +129,20 @@ function DesktopRow({ row, onUpdate, username }) {
       <div style={{ ...cell, color: sc.text, fontWeight: 700, fontSize: 13, letterSpacing: 1 }}>{row.unit}</div>
       <div style={{ ...cell, color: TYPE_COLOR[row.type] || "#4a7a4a", fontSize: 10, fontWeight: 700 }}>{row.type}</div>
       <div style={{ ...cell }}>
-        {editing === "squad" ? <select autoFocus value={localSquad} onChange={e => { setLocalSquad(e.target.value); save("squad", e.target.value); setEditing(null); }} onBlur={() => setEditing(null)} style={selectStyle}>{SQUADS.map(s => <option key={s}>{s}</option>)}</select>
-          : <span onClick={() => setEditing("squad")} style={{ color: "#7aaa7a", cursor: "pointer" }}>{localSquad}</span>}
+        {editing === "squad" ? <select autoFocus value={localSquad} onChange={e => { setLocalSquad(e.target.value); save("squad", e.target.value); stopEdit(); }} onBlur={() => stopEdit()} style={selectStyle}>{SQUADS.map(s => <option key={s}>{s}</option>)}</select>
+          : <span onClick={() => startEdit("squad")} style={{ color: "#7aaa7a", cursor: "pointer" }}>{localSquad}</span>}
       </div>
       <div style={{ ...cell }}>
-        {editing === "location" ? <select autoFocus value={localLocation} onChange={e => { setLocalLocation(e.target.value); save("location", e.target.value); setEditing(null); }} onBlur={() => setEditing(null)} style={selectStyle}>{LOCATIONS.map(l => <option key={l}>{l}</option>)}</select>
-          : <span onClick={() => setEditing("location")} style={{ color: locColor, fontWeight: 700, cursor: "pointer", fontSize: 11 }}>{localLocation}</span>}
+        {editing === "location" ? <select autoFocus value={localLocation} onChange={e => { setLocalLocation(e.target.value); save("location", e.target.value); stopEdit(); }} onBlur={() => stopEdit()} style={selectStyle}>{LOCATIONS.map(l => <option key={l}>{l}</option>)}</select>
+          : <span onClick={() => startEdit("location")} style={{ color: locColor, fontWeight: 700, cursor: "pointer", fontSize: 11 }}>{localLocation}</span>}
       </div>
       <div style={{ ...cell }}>
-        {editing === "status" ? <select autoFocus value={localStatus} onChange={e => { handleStatus(e.target.value); setEditing(null); }} onBlur={() => setEditing(null)} style={selectStyle}>{STATUSES.map(s => <option key={s} value={s}>{s}</option>)}</select>
-          : <div onClick={() => setEditing("status")} style={{ cursor: "pointer" }}><StatusBadge status={localStatus} /></div>}
+        {editing === "status" ? <select autoFocus value={localStatus} onChange={e => { handleStatus(e.target.value); }} onBlur={() => stopEdit()} style={selectStyle}>{STATUSES.map(s => <option key={s} value={s}>{s}</option>)}</select>
+          : <div onClick={() => startEdit("status")} style={{ cursor: "pointer" }}><StatusBadge status={localStatus} /></div>}
       </div>
       <div style={{ ...cell }}>
-        {editing === "faults" ? <input ref={faultsRef} autoFocus value={localFaults} onChange={e => setLocalFaults(e.target.value)} onBlur={() => { save("faults", localFaults); setEditing(null); }} onKeyDown={e => { if (e.key === "Enter") { save("faults", localFaults); setEditing(null); } }} style={{ ...inputStyle, color: isNMC ? "#ff8888" : "#88cc88", background: isNMC ? "#2a0a0a" : "#0a1a0a" }} />
-          : <span onClick={() => setEditing("faults")} style={{ color: isNMC ? "#ff6666" : "#3a6a3a", cursor: "pointer", fontStyle: localFaults ? "normal" : "italic", opacity: localFaults ? 1 : 0.5, fontSize: 12 }}>{localFaults || (isNMC ? "Click to add fault..." : "—")}</span>}
+        {editing === "faults" ? <input ref={faultsRef} autoFocus value={localFaults} onChange={e => setLocalFaults(e.target.value)} onBlur={() => { save("faults", localFaults); stopEdit(); }} onKeyDown={e => { if (e.key === "Enter") { save("faults", localFaults); stopEdit(); } }} style={{ ...inputStyle, color: isNMC ? "#ff8888" : "#88cc88", background: isNMC ? "#2a0a0a" : "#0a1a0a" }} />
+          : <span onClick={() => startEdit("faults")} style={{ color: isNMC ? "#ff6666" : "#3a6a3a", cursor: "pointer", fontStyle: localFaults ? "normal" : "italic", opacity: localFaults ? 1 : 0.5, fontSize: 12 }}>{localFaults || (isNMC ? "Click to add fault..." : "—")}</span>}
       </div>
       <div style={{ ...cell, fontSize: 10, color: "#2a5a2a", whiteSpace: "nowrap" }}>{row.last_updated || "—"}</div>
       <div style={{ ...cell, fontSize: 11, color: "#4a7a4a", fontWeight: 700 }}>{row.updated_by || "—"}</div>
@@ -436,20 +443,33 @@ export default function OutlawsTracker() {
     return () => window.removeEventListener("resize", handle);
   }, []);
 
+  // Tracks which row the user is actively editing so sync never overwrites it
+  const editingRowId = useRef(null);
+
   useEffect(() => {
     const fetchRows = async () => {
       const { data, error } = await supabase.from("fleet").select("*").order("line", { ascending: true });
-      if (!error && data) { setRows(data); setLoading(false); }
+      if (!error && data) {
+        setRows(prev => data.map(serverRow => {
+          if (editingRowId.current === serverRow.id) {
+            return prev.find(r => r.id === serverRow.id) || serverRow;
+          }
+          return serverRow;
+        }));
+        setLoading(false);
+      }
     };
     fetchRows();
 
     const channel = supabase.channel("fleet-realtime", { config: { broadcast: { self: false } } })
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "fleet" }, payload => {
+        if (editingRowId.current === payload.new.id) return;
         setRows(prev => prev.map(r => r.id === payload.new.id ? payload.new : r));
       })
       .subscribe();
 
-    const poll = setInterval(fetchRows, 4000);
+    // Poll every 8 seconds — editing rows are protected from overwrite
+    const poll = setInterval(fetchRows, 8000);
     return () => { supabase.removeChannel(channel); clearInterval(poll); };
   }, []);
 
@@ -564,8 +584,8 @@ export default function OutlawsTracker() {
 
         <div style={{ paddingBottom: isMobile ? 80 : 0 }}>
           {filtered.map(row => isMobile
-            ? <MobileCard key={row.id} row={row} onUpdate={handleUpdate} username={username} />
-            : <DesktopRow key={row.id} row={row} onUpdate={handleUpdate} username={username} />
+            ? <MobileCard key={row.id} row={row} onUpdate={handleUpdate} username={username} editingRowId={editingRowId} />
+            : <DesktopRow key={row.id} row={row} onUpdate={handleUpdate} username={username} editingRowId={editingRowId} />
           )}
           {filtered.length === 0 && <div style={{ textAlign: "center", padding: 48, color: "#2a5a2a", letterSpacing: 3 }}>NO RECORDS MATCH</div>}
         </div>
