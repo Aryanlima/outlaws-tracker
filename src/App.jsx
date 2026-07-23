@@ -8,6 +8,10 @@ const STATUSES  = ["FMC", "NMC"];
 const TYPES     = ["TRUCK", "TRAILER", "MATV", "LMTV"];
 const HISTORY_PAGE_SIZE = 50;
 
+// ── PIN CONFIG — change these to your actual PINs ─────────────────────────────
+const VIEWER_PIN = "1234";
+const EDITOR_PIN = "5678";
+
 const LOCATION_CONFIG = {
   AMP:               { color: "#cc44ff", icon: "⚙️",  desc: "Area Motor Pool" },
   BMP:               { color: "#ff9900", icon: "🔧", desc: "Battalion Motor Pool" },
@@ -25,10 +29,103 @@ const inputStyle  = { background: "#0a1a0a", border: "1px solid #2a4a2a", border
 const selectStyle = { background: "#0a1a0a", color: "#88cc88", border: "1px solid #2a4a2a", borderRadius: 3, padding: "6px 8px", fontSize: 13, fontFamily: "monospace", outline: "none", width: "100%" };
 
 // ── OFFLINE QUEUE ─────────────────────────────────────────────────────────────
-const QUEUE_KEY = "outlaws-pending-updates";
+const QUEUE_KEY  = "outlaws-pending-updates";
 const loadQueue  = () => { try { return JSON.parse(localStorage.getItem(QUEUE_KEY) || "[]"); } catch { return []; } };
 const saveQueue  = (q) => localStorage.setItem(QUEUE_KEY, JSON.stringify(q));
 const addToQueue = (item) => saveQueue([...loadQueue(), item]);
+
+// ── HELPERS ───────────────────────────────────────────────────────────────────
+function nmcDuration(nmcSince) {
+  if (!nmcSince) return null;
+  const start = new Date(nmcSince);
+  if (isNaN(start)) return null;
+  const diff  = Date.now() - start.getTime();
+  const days  = Math.floor(diff / 86400000);
+  const hours = Math.floor((diff % 86400000) / 3600000);
+  if (days > 0) return `${days}d ${hours}h`;
+  if (hours > 0) return `${hours}h`;
+  return "< 1h";
+}
+
+function nmcColor(nmcSince) {
+  if (!nmcSince) return "#cc0000";
+  const days = (Date.now() - new Date(nmcSince).getTime()) / 86400000;
+  if (days >= 7)  return "#ff0000";
+  if (days >= 3)  return "#ff6600";
+  if (days >= 1)  return "#ffaa00";
+  return "#ffcc44";
+}
+
+// ── PIN SCREEN ────────────────────────────────────────────────────────────────
+function PinScreen({ onAuth }) {
+  const [pin,     setPin]     = useState("");
+  const [error,   setError]   = useState("");
+  const [role,    setRole]    = useState("editor"); // "viewer" | "editor"
+  const inputRef = useRef(null);
+
+  useEffect(() => { inputRef.current?.focus(); }, []);
+
+  const handleSubmit = () => {
+    if (role === "editor" && pin === EDITOR_PIN) { onAuth("editor"); return; }
+    if (role === "viewer" && pin === VIEWER_PIN) { onAuth("viewer"); return; }
+    setError("Incorrect PIN"); setPin("");
+    setTimeout(() => setError(""), 2000);
+  };
+
+  const handleKey = (e) => { if (e.key === "Enter") handleSubmit(); };
+
+  const digitBtn = (d) => (
+    <button key={d} onClick={() => { const next = (pin + d).slice(0, 6); setPin(next); }} style={{ background: "#0a1a0a", border: "1px solid #2a4a2a", borderRadius: 8, color: "#88cc88", fontFamily: "monospace", fontSize: 20, fontWeight: 700, padding: "16px", cursor: "pointer", width: "100%", aspectRatio: "1" }}>
+      {d}
+    </button>
+  );
+
+  return (
+    <div style={{ minHeight: "100vh", background: "#050d05", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+      <div style={{ background: "#0a1a0a", border: "1px solid #2a4a2a", borderRadius: 16, padding: 32, textAlign: "center", maxWidth: 320, width: "100%" }}>
+        <div style={{ fontSize: 36, marginBottom: 8 }}>☠</div>
+        <div style={{ fontSize: 20, fontWeight: 900, color: "#00ff6a", letterSpacing: 4, marginBottom: 4 }}>OUTLAWS</div>
+        <div style={{ fontSize: 10, color: "#3a6a3a", letterSpacing: 3, marginBottom: 24 }}>MAINTENANCE TRACKER</div>
+
+        {/* Role selector */}
+        <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
+          {["viewer","editor"].map(r => (
+            <button key={r} onClick={() => { setRole(r); setPin(""); setError(""); }} style={{ flex: 1, background: role === r ? (r === "editor" ? "#00c44f" : "#2a4a8a") : "#0a1a0a", color: role === r ? (r === "editor" ? "#000" : "#fff") : "#4a7a4a", border: `1px solid ${role === r ? (r === "editor" ? "#00c44f" : "#4a6aaa") : "#2a4a2a"}`, borderRadius: 6, padding: "8px", fontFamily: "monospace", fontWeight: 700, fontSize: 11, letterSpacing: 2, cursor: "pointer" }}>
+              {r === "viewer" ? "👁 VIEWER" : "✏️ EDITOR"}
+            </button>
+          ))}
+        </div>
+
+        {/* PIN dots */}
+        <div style={{ display: "flex", gap: 10, justifyContent: "center", marginBottom: 20 }}>
+          {[0,1,2,3,4,5].slice(0, Math.max(4, pin.length + 1)).map((_, i) => (
+            <div key={i} style={{ width: 14, height: 14, borderRadius: "50%", background: i < pin.length ? "#00ff6a" : "#1a3a1a", border: "1px solid #2a4a2a", transition: "background 0.15s" }} />
+          ))}
+        </div>
+
+        {/* Hidden input for keyboard */}
+        <input ref={inputRef} value={pin} onChange={e => setPin(e.target.value.replace(/\D/g,"").slice(0,6))} onKeyDown={handleKey} type="password" inputMode="numeric" style={{ position: "absolute", opacity: 0, pointerEvents: "none", width: 1, height: 1 }} />
+
+        {/* Numpad */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginBottom: 12 }}>
+          {[1,2,3,4,5,6,7,8,9].map(d => digitBtn(String(d)))}
+          <div />
+          {digitBtn("0")}
+          <button onClick={() => setPin(p => p.slice(0,-1))} style={{ background: "#0a1a0a", border: "1px solid #2a4a2a", borderRadius: 8, color: "#ff4444", fontFamily: "monospace", fontSize: 18, cursor: "pointer", padding: "16px" }}>⌫</button>
+        </div>
+
+        <button onClick={handleSubmit} style={{ background: role === "editor" ? "#00c44f" : "#2a4a8a", color: role === "editor" ? "#000" : "#fff", border: "none", borderRadius: 8, padding: "12px", fontFamily: "monospace", fontWeight: 700, fontSize: 14, letterSpacing: 2, cursor: "pointer", width: "100%", marginBottom: 8 }}>
+          ENTER
+        </button>
+
+        {error && <div style={{ color: "#ff4444", fontFamily: "monospace", fontSize: 12, letterSpacing: 2, marginTop: 8 }}>⚠ {error}</div>}
+        <div style={{ color: "#2a5a2a", fontSize: 10, fontFamily: "monospace", marginTop: 12, letterSpacing: 1 }}>
+          {role === "viewer" ? "VIEW ONLY — no editing" : "FULL ACCESS — all edits"}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ── SHARED COMPONENTS ─────────────────────────────────────────────────────────
 function StatusBadge({ status }) {
@@ -36,17 +133,24 @@ function StatusBadge({ status }) {
   return <span style={{ background: cfg.badge, color: "#fff", fontFamily: "monospace", fontWeight: 900, fontSize: 12, letterSpacing: 2, padding: "4px 12px", borderRadius: 4, display: "inline-block", minWidth: 50, textAlign: "center" }}>{status || "FMC"}</span>;
 }
 
+function NmcTimer({ nmcSince }) {
+  const dur   = nmcDuration(nmcSince);
+  const color = nmcColor(nmcSince);
+  if (!dur) return null;
+  return <span style={{ background: `${color}22`, border: `1px solid ${color}66`, color, fontFamily: "monospace", fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 4, letterSpacing: 1, whiteSpace: "nowrap" }}>⏱ {dur}</span>;
+}
+
 function SaveError({ onRetry }) {
   return (
     <div style={{ background: "#2a0808", border: "1px solid #cc0000", borderRadius: 6, padding: "6px 10px", fontSize: 11, color: "#ff6666", fontFamily: "monospace", marginTop: 4, display: "flex", alignItems: "center", gap: 8 }}>
-      ⚠ Save failed — no connection
+      ⚠ Save failed
       <span onClick={onRetry} style={{ color: "#ffaa44", cursor: "pointer", textDecoration: "underline" }}>Retry</span>
     </div>
   );
 }
 
-// ── MOBILE CARD (memoized) ────────────────────────────────────────────────────
-const MobileCard = memo(function MobileCard({ row, onUpdate, username, editingRowId }) {
+// ── MOBILE CARD ───────────────────────────────────────────────────────────────
+const MobileCard = memo(function MobileCard({ row, onUpdate, username, editingRowId, isViewer }) {
   const [editing,       setEditing]       = useState(null);
   const [localStatus,   setLocalStatus]   = useState(row.status);
   const [localFaults,   setLocalFaults]   = useState(row.faults);
@@ -61,8 +165,8 @@ const MobileCard = memo(function MobileCard({ row, onUpdate, username, editingRo
     setLocalLocation(row.location); setLocalSquad(row.squad);
   }, [row, editing]);
 
-  const startEdit = (field) => { if (editingRowId) editingRowId.current = row.id; setEditing(field); };
-  const stopEdit  = ()       => { if (editingRowId) editingRowId.current = null;  setEditing(null);  };
+  const startEdit = (field) => { if (isViewer) return; if (editingRowId) editingRowId.current = row.id; setEditing(field); };
+  const stopEdit  = ()       => { if (editingRowId) editingRowId.current = null; setEditing(null); };
 
   const isNMC    = localStatus === "NMC";
   const sc       = STATUS_CONFIG[localStatus] || STATUS_CONFIG.FMC;
@@ -77,39 +181,43 @@ const MobileCard = memo(function MobileCard({ row, onUpdate, username, editingRo
   }, [row, onUpdate, username]);
 
   const handleStatus = (val) => {
-    setLocalStatus(val); save("status", val);
+    setLocalStatus(val);
+    save("status", val);
     if (val === "NMC") setTimeout(() => { startEdit("faults"); faultsRef.current?.focus(); }, 80);
     else stopEdit();
   };
 
   return (
-    <div style={{ background: isNMC ? "rgba(255,30,30,0.07)" : "#080f08", border: `1px solid ${isNMC ? "#4a1010" : "#1a2a1a"}`, borderRadius: 10, margin: "8px 12px", padding: "12px 14px" }}>
+    <div style={{ background: isNMC ? "rgba(255,30,30,0.07)" : "#080f08", border: `1px solid ${isNMC ? "#4a1010" : "#1a2a1a"}`, borderRadius: 10, margin: "8px 12px", padding: "12px 14px", opacity: isViewer ? 0.95 : 1 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
         <span style={{ color: "#3a6a3a", fontSize: 11, fontFamily: "monospace", minWidth: 20 }}>{row.line}</span>
         <span style={{ color: sc.text, fontWeight: 900, fontSize: 16, fontFamily: "monospace", letterSpacing: 1 }}>{row.unit}</span>
         <span style={{ color: TYPE_COLOR[row.type] || "#4a7a4a", fontSize: 10, fontFamily: "monospace", background: "#0f1f0f", padding: "2px 8px", borderRadius: 4, fontWeight: 700 }}>{row.type}</span>
-        <div style={{ marginLeft: "auto" }} onClick={() => startEdit("status")}><StatusBadge status={localStatus} /></div>
+        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6 }}>
+          {isNMC && <NmcTimer nmcSince={row.nmc_since} />}
+          <div onClick={() => startEdit("status")} style={{ cursor: isViewer ? "default" : "pointer" }}><StatusBadge status={localStatus} /></div>
+        </div>
       </div>
-      {editing === "status" && <select autoFocus value={localStatus} onChange={e => { handleStatus(e.target.value); }} onBlur={() => stopEdit()} style={{ ...selectStyle, marginBottom: 10 }}>{STATUSES.map(s => <option key={s} value={s}>{s}</option>)}</select>}
+      {editing === "status" && !isViewer && <select autoFocus value={localStatus} onChange={e => { handleStatus(e.target.value); }} onBlur={() => stopEdit()} style={{ ...selectStyle, marginBottom: 10 }}>{STATUSES.map(s => <option key={s} value={s}>{s}</option>)}</select>}
       <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 9, color: "#3a6a3a", letterSpacing: 2, marginBottom: 4 }}>SQUAD</div>
-          {editing === "squad"
+          {editing === "squad" && !isViewer
             ? <select autoFocus value={localSquad} onChange={e => { setLocalSquad(e.target.value); save("squad", e.target.value); stopEdit(); }} onBlur={() => stopEdit()} style={selectStyle}>{SQUADS.map(s => <option key={s}>{s}</option>)}</select>
-            : <div onClick={() => startEdit("squad")} style={{ color: "#7aaa7a", fontFamily: "monospace", fontSize: 13, fontWeight: 700, cursor: "pointer", padding: "6px 8px", background: "#0a1a0a", borderRadius: 4, border: "1px solid #1a3a1a" }}>{localSquad}</div>}
+            : <div onClick={() => startEdit("squad")} style={{ color: "#7aaa7a", fontFamily: "monospace", fontSize: 13, fontWeight: 700, cursor: isViewer ? "default" : "pointer", padding: "6px 8px", background: "#0a1a0a", borderRadius: 4, border: "1px solid #1a3a1a" }}>{localSquad}</div>}
         </div>
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 9, color: "#3a6a3a", letterSpacing: 2, marginBottom: 4 }}>LOCATION</div>
-          {editing === "location"
+          {editing === "location" && !isViewer
             ? <select autoFocus value={localLocation} onChange={e => { setLocalLocation(e.target.value); save("location", e.target.value); stopEdit(); }} onBlur={() => stopEdit()} style={selectStyle}>{LOCATIONS.map(l => <option key={l}>{l}</option>)}</select>
-            : <div onClick={() => startEdit("location")} style={{ color: locColor, fontFamily: "monospace", fontSize: 13, fontWeight: 700, cursor: "pointer", padding: "6px 8px", background: "#0a1a0a", borderRadius: 4, border: "1px solid #1a3a1a" }}>{localLocation}</div>}
+            : <div onClick={() => startEdit("location")} style={{ color: locColor, fontFamily: "monospace", fontSize: 13, fontWeight: 700, cursor: isViewer ? "default" : "pointer", padding: "6px 8px", background: "#0a1a0a", borderRadius: 4, border: "1px solid #1a3a1a" }}>{localLocation}</div>}
         </div>
       </div>
       <div>
         <div style={{ fontSize: 9, color: "#3a6a3a", letterSpacing: 2, marginBottom: 4 }}>FAULTS / DETAILS</div>
-        {editing === "faults"
+        {editing === "faults" && !isViewer
           ? <input ref={faultsRef} autoFocus value={localFaults} onChange={e => setLocalFaults(e.target.value)} onBlur={() => { save("faults", localFaults); stopEdit(); }} onKeyDown={e => { if (e.key === "Enter") { save("faults", localFaults); stopEdit(); } }} placeholder="Enter fault description..." style={{ ...inputStyle, color: isNMC ? "#ff8888" : "#88cc88", background: isNMC ? "#2a0a0a" : "#0a1a0a", padding: "8px 10px" }} />
-          : <div onClick={() => startEdit("faults")} style={{ color: isNMC ? "#ff6666" : "#3a6a3a", fontFamily: "monospace", fontSize: 12, cursor: "pointer", padding: "8px 10px", background: "#0a1a0a", borderRadius: 4, border: `1px solid ${isNMC ? "#4a1010" : "#1a2a1a"}`, fontStyle: localFaults ? "normal" : "italic", minHeight: 36 }}>{localFaults || (isNMC ? "Tap to add fault..." : "— No faults —")}</div>}
+          : <div onClick={() => startEdit("faults")} style={{ color: isNMC ? "#ff6666" : "#3a6a3a", fontFamily: "monospace", fontSize: 12, cursor: isViewer ? "default" : "pointer", padding: "8px 10px", background: "#0a1a0a", borderRadius: 4, border: `1px solid ${isNMC ? "#4a1010" : "#1a2a1a"}`, fontStyle: localFaults ? "normal" : "italic", minHeight: 36 }}>{localFaults || (isNMC ? (isViewer ? "No fault listed" : "Tap to add fault...") : "— No faults —")}</div>}
       </div>
       {saveError && <SaveError onRetry={() => { setSaveError(false); save("faults", localFaults); }} />}
       {row.last_updated && <div style={{ marginTop: 8, fontSize: 10, color: "#2a5a2a", fontFamily: "monospace" }}>🕐 {row.last_updated} · {row.updated_by}</div>}
@@ -117,8 +225,8 @@ const MobileCard = memo(function MobileCard({ row, onUpdate, username, editingRo
   );
 });
 
-// ── DESKTOP ROW (memoized) ────────────────────────────────────────────────────
-const DesktopRow = memo(function DesktopRow({ row, onUpdate, username, editingRowId }) {
+// ── DESKTOP ROW ───────────────────────────────────────────────────────────────
+const DesktopRow = memo(function DesktopRow({ row, onUpdate, username, editingRowId, isViewer }) {
   const [editing,       setEditing]       = useState(null);
   const [localStatus,   setLocalStatus]   = useState(row.status);
   const [localFaults,   setLocalFaults]   = useState(row.faults);
@@ -133,8 +241,8 @@ const DesktopRow = memo(function DesktopRow({ row, onUpdate, username, editingRo
     setLocalLocation(row.location); setLocalSquad(row.squad);
   }, [row, editing]);
 
-  const startEdit = (field) => { if (editingRowId) editingRowId.current = row.id; setEditing(field); };
-  const stopEdit  = ()       => { if (editingRowId) editingRowId.current = null;  setEditing(null);  };
+  const startEdit = (field) => { if (isViewer) return; if (editingRowId) editingRowId.current = row.id; setEditing(field); };
+  const stopEdit  = ()       => { if (editingRowId) editingRowId.current = null; setEditing(null); };
 
   const sc       = STATUS_CONFIG[localStatus] || STATUS_CONFIG.FMC;
   const isNMC    = localStatus === "NMC";
@@ -156,29 +264,33 @@ const DesktopRow = memo(function DesktopRow({ row, onUpdate, username, editingRo
   };
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "36px 80px 72px 72px 130px 80px 1fr 148px 120px", alignItems: "center", borderBottom: `1px solid ${isNMC ? "#3a1010" : "#1a2a1a"}`, background: isNMC ? "rgba(255,40,40,0.06)" : "transparent", minHeight: saveError ? "auto" : 42 }}>
+    <div style={{ display: "grid", gridTemplateColumns: "36px 80px 72px 72px 130px 80px 110px 1fr 148px 120px", alignItems: "center", borderBottom: `1px solid ${isNMC ? "#3a1010" : "#1a2a1a"}`, background: isNMC ? "rgba(255,40,40,0.06)" : "transparent", minHeight: 42 }}>
       <div style={{ ...cell, textAlign: "center", color: "#3a6a3a", fontSize: 11 }}>{row.line}</div>
       <div style={{ ...cell, color: sc.text, fontWeight: 700, fontSize: 13, letterSpacing: 1 }}>{row.unit}</div>
       <div style={{ ...cell, color: TYPE_COLOR[row.type] || "#4a7a4a", fontSize: 10, fontWeight: 700 }}>{row.type}</div>
       <div style={{ ...cell }}>
-        {editing === "squad"
+        {editing === "squad" && !isViewer
           ? <select autoFocus value={localSquad} onChange={e => { setLocalSquad(e.target.value); save("squad", e.target.value); stopEdit(); }} onBlur={() => stopEdit()} style={selectStyle}>{SQUADS.map(s => <option key={s}>{s}</option>)}</select>
-          : <span onClick={() => startEdit("squad")} style={{ color: "#7aaa7a", cursor: "pointer" }}>{localSquad}</span>}
+          : <span onClick={() => startEdit("squad")} style={{ color: "#7aaa7a", cursor: isViewer ? "default" : "pointer" }}>{localSquad}</span>}
       </div>
       <div style={{ ...cell }}>
-        {editing === "location"
+        {editing === "location" && !isViewer
           ? <select autoFocus value={localLocation} onChange={e => { setLocalLocation(e.target.value); save("location", e.target.value); stopEdit(); }} onBlur={() => stopEdit()} style={selectStyle}>{LOCATIONS.map(l => <option key={l}>{l}</option>)}</select>
-          : <span onClick={() => startEdit("location")} style={{ color: locColor, fontWeight: 700, cursor: "pointer", fontSize: 11 }}>{localLocation}</span>}
+          : <span onClick={() => startEdit("location")} style={{ color: locColor, fontWeight: 700, cursor: isViewer ? "default" : "pointer", fontSize: 11 }}>{localLocation}</span>}
       </div>
       <div style={{ ...cell }}>
-        {editing === "status"
+        {editing === "status" && !isViewer
           ? <select autoFocus value={localStatus} onChange={e => { handleStatus(e.target.value); }} onBlur={() => stopEdit()} style={selectStyle}>{STATUSES.map(s => <option key={s} value={s}>{s}</option>)}</select>
-          : <div onClick={() => startEdit("status")} style={{ cursor: "pointer" }}><StatusBadge status={localStatus} /></div>}
+          : <div onClick={() => startEdit("status")} style={{ cursor: isViewer ? "default" : "pointer" }}><StatusBadge status={localStatus} /></div>}
+      </div>
+      {/* NMC Timer column */}
+      <div style={{ ...cell }}>
+        {isNMC && <NmcTimer nmcSince={row.nmc_since} />}
       </div>
       <div style={{ ...cell, paddingTop: saveError ? 4 : 0, paddingBottom: saveError ? 4 : 0 }}>
-        {editing === "faults"
+        {editing === "faults" && !isViewer
           ? <input ref={faultsRef} autoFocus value={localFaults} onChange={e => setLocalFaults(e.target.value)} onBlur={() => { save("faults", localFaults); stopEdit(); }} onKeyDown={e => { if (e.key === "Enter") { save("faults", localFaults); stopEdit(); } }} style={{ ...inputStyle, color: isNMC ? "#ff8888" : "#88cc88", background: isNMC ? "#2a0a0a" : "#0a1a0a" }} />
-          : <span onClick={() => startEdit("faults")} style={{ color: isNMC ? "#ff6666" : "#3a6a3a", cursor: "pointer", fontStyle: localFaults ? "normal" : "italic", opacity: localFaults ? 1 : 0.5, fontSize: 12 }}>{localFaults || (isNMC ? "Click to add fault..." : "—")}</span>}
+          : <span onClick={() => startEdit("faults")} style={{ color: isNMC ? "#ff6666" : "#3a6a3a", cursor: isViewer ? "default" : "pointer", fontStyle: localFaults ? "normal" : "italic", opacity: localFaults ? 1 : 0.5, fontSize: 12 }}>{localFaults || (isNMC ? "Click to add fault..." : "—")}</span>}
         {saveError && <SaveError onRetry={() => { setSaveError(false); save("faults", localFaults); }} />}
       </div>
       <div style={{ ...cell, fontSize: 10, color: "#2a5a2a", whiteSpace: "nowrap" }}>{row.last_updated || "—"}</div>
@@ -197,7 +309,7 @@ function Dashboard({ rows, isMobile }) {
   const bySquad    = ["1SQD","2SQD","3SQD","4SQD"].map(sq => { const s = rows.filter(r => r.squad === sq); return { sq, total: s.length, fmc: s.filter(r=>r.status==="FMC").length, nmc: s.filter(r=>r.status==="NMC").length }; });
   const byType     = ["TRUCK","TRAILER","MATV","LMTV"].map(t => { const s = rows.filter(r => r.type === t); return { t, total: s.length, fmc: s.filter(r=>r.status==="FMC").length, nmc: s.filter(r=>r.status==="NMC").length }; }).filter(x => x.total > 0);
   const byLocation = LOCATIONS.map(l => { const s = rows.filter(r => r.location === l); return { l, total: s.length, fmc: s.filter(r=>r.status==="FMC").length, nmc: s.filter(r=>r.status==="NMC").length, cfg: LOCATION_CONFIG[l] }; }).filter(x => x.total > 0);
-  const nmcList    = rows.filter(r => r.status === "NMC").sort((a,b) => a.unit.localeCompare(b.unit));
+  const nmcList    = rows.filter(r => r.status === "NMC").sort((a,b) => { const da = new Date(a.nmc_since||0); const db = new Date(b.nmc_since||0); return da - db; });
 
   const card = (title, value, color, sub) => (
     <div style={{ background: "#0a1a0a", border: `1px solid ${color}33`, borderRadius: 10, padding: "16px 20px", flex: 1, minWidth: isMobile ? "calc(50% - 6px)" : 120 }}>
@@ -223,6 +335,7 @@ function Dashboard({ rows, isMobile }) {
           <div style={{ background: "#00c44f", width: `${pct}%`, height: "100%", borderRadius: 6, transition: "width 0.5s" }} />
         </div>
       </div>
+
       <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 24 }}>
         <div style={{ flex: 1, minWidth: isMobile ? "100%" : 280 }}>
           <div style={{ fontSize: 10, color: "#3a6a3a", letterSpacing: 3, marginBottom: 10 }}>BY SQUAD</div>
@@ -276,18 +389,25 @@ function Dashboard({ rows, isMobile }) {
           </div>
         </div>
       </div>
+
+      {/* NMC List sorted by time down — longest first */}
       <div>
-        <div style={{ fontSize: 10, color: "#cc0000", letterSpacing: 3, marginBottom: 10 }}>⚠ NMC UNITS ({nmcList.length})</div>
+        <div style={{ fontSize: 10, color: "#cc0000", letterSpacing: 3, marginBottom: 10 }}>⚠ NMC UNITS — SORTED BY TIME DOWN ({nmcList.length})</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          {nmcList.map(u => (
-            <div key={u.id} style={{ background: "rgba(204,0,0,0.06)", border: "1px solid #3a1010", borderRadius: 8, padding: "8px 14px", display: "flex", alignItems: "flex-start", gap: 10, flexWrap: "wrap" }}>
-              <span style={{ color: "#ff4444", fontFamily: "monospace", fontWeight: 900, fontSize: 13, minWidth: 60 }}>{u.unit}</span>
-              <span style={{ color: "#cc4444", fontFamily: "monospace", fontSize: 10, background: "#1a0808", padding: "2px 6px", borderRadius: 3 }}>{u.squad}</span>
-              <span style={{ color: "#ff9900", fontFamily: "monospace", fontSize: 10 }}>{u.location}</span>
-              <span style={{ color: "#aa4444", fontFamily: "monospace", fontSize: 11, flex: 1 }}>{u.faults || "—"}</span>
-              {u.updated_by && <span style={{ color: "#3a4a3a", fontFamily: "monospace", fontSize: 10 }}>{u.updated_by}</span>}
-            </div>
-          ))}
+          {nmcList.map(u => {
+            const dur   = nmcDuration(u.nmc_since);
+            const color = nmcColor(u.nmc_since);
+            return (
+              <div key={u.id} style={{ background: "rgba(204,0,0,0.06)", border: "1px solid #3a1010", borderRadius: 8, padding: "8px 14px", display: "flex", alignItems: "flex-start", gap: 10, flexWrap: "wrap" }}>
+                <span style={{ color: "#ff4444", fontFamily: "monospace", fontWeight: 900, fontSize: 13, minWidth: 60 }}>{u.unit}</span>
+                <span style={{ color: "#cc4444", fontFamily: "monospace", fontSize: 10, background: "#1a0808", padding: "2px 6px", borderRadius: 3 }}>{u.squad}</span>
+                <span style={{ color: "#ff9900", fontFamily: "monospace", fontSize: 10 }}>{u.location}</span>
+                {dur && <span style={{ color, fontFamily: "monospace", fontSize: 10, fontWeight: 700, background: `${color}22`, padding: "2px 8px", borderRadius: 3 }}>⏱ {dur}</span>}
+                <span style={{ color: "#aa4444", fontFamily: "monospace", fontSize: 11, flex: 1 }}>{u.faults || "—"}</span>
+                {u.updated_by && <span style={{ color: "#3a4a3a", fontFamily: "monospace", fontSize: 10 }}>{u.updated_by}</span>}
+              </div>
+            );
+          })}
           {nmcList.length === 0 && <div style={{ color: "#00c44f", fontFamily: "monospace", fontSize: 13, letterSpacing: 2, padding: 16, textAlign: "center" }}>✓ ALL UNITS FMC</div>}
         </div>
       </div>
@@ -295,7 +415,7 @@ function Dashboard({ rows, isMobile }) {
   );
 }
 
-// ── HISTORY (paginated) ───────────────────────────────────────────────────────
+// ── HISTORY ───────────────────────────────────────────────────────────────────
 function History({ isMobile }) {
   const [logs,       setLogs]       = useState([]);
   const [loading,    setLoading]    = useState(true);
@@ -303,20 +423,25 @@ function History({ isMobile }) {
   const [page,       setPage]       = useState(0);
   const [hasMore,    setHasMore]    = useState(true);
   const [filterUnit, setFilterUnit] = useState("");
+  const [dateFrom,   setDateFrom]   = useState("");
+  const [dateTo,     setDateTo]     = useState("");
 
-  const fetchPage = useCallback(async (pageNum) => {
+  const fetchPage = useCallback(async (pageNum, unit, from, to) => {
     setLoading(true); setLoadError(false);
-    const { data, error } = await supabase
-      .from("fleet_history").select("*")
-      .order("changed_at", { ascending: false })
-      .range(pageNum * HISTORY_PAGE_SIZE, (pageNum + 1) * HISTORY_PAGE_SIZE - 1);
+    let query = supabase.from("fleet_history").select("*").order("changed_at", { ascending: false });
+    if (unit) query = query.ilike("unit", `%${unit}%`);
+    if (from) query = query.gte("changed_at", new Date(from).toISOString());
+    if (to)   query = query.lte("changed_at", new Date(to + "T23:59:59").toISOString());
+    query = query.range(pageNum * HISTORY_PAGE_SIZE, (pageNum + 1) * HISTORY_PAGE_SIZE - 1);
+    const { data, error } = await query;
     if (error) { setLoadError(true); setLoading(false); return; }
     if (data.length < HISTORY_PAGE_SIZE) setHasMore(false);
+    else setHasMore(true);
     setLogs(prev => pageNum === 0 ? data : [...prev, ...data]);
     setLoading(false);
   }, []);
 
-  useEffect(() => { fetchPage(0); }, [fetchPage]);
+  useEffect(() => { setPage(0); fetchPage(0, filterUnit, dateFrom, dateTo); }, [filterUnit, dateFrom, dateTo, fetchPage]);
 
   useEffect(() => {
     const ch = supabase.channel("history-live")
@@ -326,25 +451,49 @@ function History({ isMobile }) {
     return () => supabase.removeChannel(ch);
   }, []);
 
-  const loadMore = () => { const next = page + 1; setPage(next); fetchPage(next); };
-  const filtered = filterUnit ? logs.filter(l => l.unit.toLowerCase().includes(filterUnit.toLowerCase())) : logs;
+  const loadMore = () => { const next = page + 1; setPage(next); fetchPage(next, filterUnit, dateFrom, dateTo); };
+
   const fieldLabel = (f) => ({ status: "STATUS", faults: "FAULTS", location: "LOCATION", squad: "SQUAD" }[f] || f.toUpperCase());
   const fieldColor = (f) => ({ status: "#00aaff", faults: "#ff6600", location: "#cc44ff", squad: "#ffcc00" }[f] || "#888");
+
+  const clearFilters = () => { setFilterUnit(""); setDateFrom(""); setDateTo(""); };
+  const hasFilters   = filterUnit || dateFrom || dateTo;
 
   return (
     <div style={{ padding: isMobile ? "12px" : "24px" }}>
       <div style={{ fontSize: 11, color: "#3a6a3a", letterSpacing: 3, marginBottom: 16 }}>CHANGE LOG</div>
-      <input value={filterUnit} onChange={e => setFilterUnit(e.target.value)} placeholder="Filter by unit (e.g. C-210)..." style={{ ...inputStyle, maxWidth: 280, marginBottom: 16, fontSize: 12 }} />
+
+      {/* Filters */}
+      <div style={{ background: "#080f08", border: "1px solid #1a2a1a", borderRadius: 10, padding: "14px", marginBottom: 16, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
+        <div style={{ flex: 1, minWidth: 140 }}>
+          <div style={{ fontSize: 9, color: "#3a6a3a", letterSpacing: 2, marginBottom: 4 }}>FILTER BY UNIT</div>
+          <input value={filterUnit} onChange={e => setFilterUnit(e.target.value)} placeholder="e.g. C-210" style={{ ...inputStyle, fontSize: 12 }} />
+        </div>
+        <div style={{ flex: 1, minWidth: 140 }}>
+          <div style={{ fontSize: 9, color: "#3a6a3a", letterSpacing: 2, marginBottom: 4 }}>FROM DATE</div>
+          <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} style={{ ...inputStyle, fontSize: 12, colorScheme: "dark" }} />
+        </div>
+        <div style={{ flex: 1, minWidth: 140 }}>
+          <div style={{ fontSize: 9, color: "#3a6a3a", letterSpacing: 2, marginBottom: 4 }}>TO DATE</div>
+          <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} style={{ ...inputStyle, fontSize: 12, colorScheme: "dark" }} />
+        </div>
+        {hasFilters && (
+          <button onClick={clearFilters} style={{ background: "#1a0a0a", border: "1px solid #4a2a2a", color: "#ff6666", fontFamily: "monospace", fontSize: 11, padding: "6px 14px", borderRadius: 6, cursor: "pointer", letterSpacing: 1 }}>CLEAR</button>
+        )}
+      </div>
+
       {loadError && (
-        <div style={{ background: "#2a0808", border: "1px solid #cc0000", borderRadius: 6, padding: "10px 14px", color: "#ff6666", fontFamily: "monospace", fontSize: 12, marginBottom: 12, display: "flex", gap: 10, alignItems: "center" }}>
-          ⚠ Failed to load history
-          <span onClick={() => fetchPage(0)} style={{ color: "#ffaa44", cursor: "pointer", textDecoration: "underline" }}>Retry</span>
+        <div style={{ background: "#2a0808", border: "1px solid #cc0000", borderRadius: 6, padding: "10px 14px", color: "#ff6666", fontFamily: "monospace", fontSize: 12, marginBottom: 12, display: "flex", gap: 10 }}>
+          ⚠ Failed to load
+          <span onClick={() => fetchPage(0, filterUnit, dateFrom, dateTo)} style={{ color: "#ffaa44", cursor: "pointer", textDecoration: "underline" }}>Retry</span>
         </div>
       )}
-      {loading && page === 0 && <div style={{ color: "#3a6a3a", fontFamily: "monospace", letterSpacing: 2 }}>LOADING...</div>}
-      {!loading && filtered.length === 0 && <div style={{ color: "#2a5a2a", fontFamily: "monospace", fontSize: 12, letterSpacing: 2, padding: 24, textAlign: "center" }}>NO CHANGES RECORDED YET</div>}
+
+      {loading && page === 0 && <div style={{ color: "#3a6a3a", fontFamily: "monospace", letterSpacing: 2, padding: 16 }}>LOADING...</div>}
+      {!loading && logs.length === 0 && <div style={{ color: "#2a5a2a", fontFamily: "monospace", fontSize: 12, letterSpacing: 2, padding: 24, textAlign: "center" }}>NO RECORDS FOUND</div>}
+
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-        {filtered.map(log => {
+        {logs.map(log => {
           const date = new Date(log.changed_at);
           const ts   = `${date.getMonth()+1}/${date.getDate()}/${date.getFullYear()} ${date.toLocaleTimeString("en-US",{hour12:false})}`;
           const fc   = fieldColor(log.field_changed);
@@ -365,7 +514,7 @@ function History({ isMobile }) {
           );
         })}
       </div>
-      {hasMore && !filterUnit && (
+      {hasMore && (
         <button onClick={loadMore} disabled={loading} style={{ marginTop: 16, background: "#0a1a0a", border: "1px solid #2a4a2a", color: "#5a8a5a", fontFamily: "monospace", fontSize: 12, padding: "8px 20px", borderRadius: 6, cursor: "pointer", width: "100%", letterSpacing: 2 }}>
           {loading ? "LOADING..." : "LOAD MORE"}
         </button>
@@ -380,7 +529,6 @@ function LocationBreakdown({ rows, isMobile }) {
   LOCATIONS.forEach(l => { grouped[l] = []; });
   rows.forEach(r => { const loc = r.location || "CMP"; if (!grouped[loc]) grouped[loc] = []; grouped[loc].push(r); });
   const active = LOCATIONS.filter(l => grouped[l]?.length > 0);
-
   return (
     <div style={{ padding: isMobile ? "12px" : "24px" }}>
       <div style={{ fontSize: 11, color: "#3a6a3a", letterSpacing: 3, marginBottom: 16 }}>LOCATION BREAKDOWN</div>
@@ -434,6 +582,7 @@ function LocationBreakdown({ rows, isMobile }) {
                             <span style={{ fontFamily: "monospace", fontWeight: 900, fontSize: 13, color: sc.text, minWidth: 54 }}>{unit.unit}</span>
                             <StatusBadge status={unit.status} />
                             <span style={{ fontSize: 10, color: "#4a7a4a", fontFamily: "monospace" }}>{unit.squad}</span>
+                            {unit.status === "NMC" && <NmcTimer nmcSince={unit.nmc_since} />}
                             {unit.faults && <span style={{ fontSize: 11, color: unit.status==="NMC"?"#ff6666":"#5a8a5a", fontFamily: "monospace", flex: 1 }}>⚠ {unit.faults}</span>}
                           </div>
                         );
@@ -452,6 +601,7 @@ function LocationBreakdown({ rows, isMobile }) {
 
 // ── MAIN APP ──────────────────────────────────────────────────────────────────
 export default function OutlawsTracker() {
+  const [role,         setRole]         = useState(() => sessionStorage.getItem("outlaws-role") || null);
   const [rows,         setRows]         = useState([]);
   const [loading,      setLoading]      = useState(true);
   const [loadError,    setLoadError]    = useState(false);
@@ -466,9 +616,18 @@ export default function OutlawsTracker() {
   const [online,       setOnline]       = useState(true);
   const [pendingCount, setPendingCount] = useState(loadQueue().length);
 
-  const editingRowId  = useRef(null);
-  const realtimeOk    = useRef(false);
-  const pollRef       = useRef(null);
+  const isViewer     = role === "viewer";
+  const editingRowId = useRef(null);
+  const realtimeOk   = useRef(false);
+  const pollRef      = useRef(null);
+
+  const handleAuth = (r) => {
+    setRole(r);
+    sessionStorage.setItem("outlaws-role", r);
+    if (r === "viewer" && !username) {
+      setUsername("VIEWER"); localStorage.setItem("outlaws-username", "VIEWER"); setShowPrompt(false);
+    }
+  };
 
   useEffect(() => {
     const handle = () => setIsMobile(window.innerWidth < 768);
@@ -476,7 +635,6 @@ export default function OutlawsTracker() {
     return () => window.removeEventListener("resize", handle);
   }, []);
 
-  // Flush pending offline queue when back online
   const flushQueue = useCallback(async () => {
     const queue = loadQueue();
     if (!queue.length) return;
@@ -490,6 +648,7 @@ export default function OutlawsTracker() {
   }, []);
 
   useEffect(() => {
+    if (!role) return;
     const fetchRows = async () => {
       const { data, error } = await supabase.from("fleet").select("*").order("line", { ascending: true });
       if (error) { setLoadError(true); setLoading(false); setOnline(false); return; }
@@ -501,7 +660,6 @@ export default function OutlawsTracker() {
       setLoading(false);
       flushQueue();
     };
-
     fetchRows();
 
     const channel = supabase.channel("fleet-realtime", { config: { broadcast: { self: false } } })
@@ -512,60 +670,50 @@ export default function OutlawsTracker() {
       .subscribe(status => {
         realtimeOk.current = status === "SUBSCRIBED";
         setOnline(status === "SUBSCRIBED");
-        // Only start polling if realtime failed to connect
-        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-          if (!pollRef.current) pollRef.current = setInterval(fetchRows, 8000);
-        } else if (status === "SUBSCRIBED") {
-          if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
-          // Light poll every 15s as safety net even when realtime is up
-          pollRef.current = setInterval(fetchRows, 15000);
-        }
+        if (pollRef.current) clearInterval(pollRef.current);
+        pollRef.current = setInterval(fetchRows, status === "SUBSCRIBED" ? 15000 : 8000);
       });
 
-    // Listen for browser online/offline events
     const goOnline  = () => { setOnline(true);  fetchRows(); };
-    const goOffline = () => { setOnline(false); };
+    const goOffline = () => setOnline(false);
     window.addEventListener("online",  goOnline);
     window.addEventListener("offline", goOffline);
-
     return () => {
       supabase.removeChannel(channel);
       if (pollRef.current) clearInterval(pollRef.current);
       window.removeEventListener("online",  goOnline);
       window.removeEventListener("offline", goOffline);
     };
-  }, [flushQueue]);
+  }, [role, flushQueue]);
 
-  // handleUpdate — returns true on success, false on failure; queues offline saves
   const handleUpdate = useCallback(async (row, field, value, ts, user) => {
+    if (isViewer) return false;
     const oldValue = row[field] || "";
     const changes  = { [field]: value, last_updated: ts, updated_by: user };
-    // Optimistic update
+    // If changing to NMC, record the start time
+    if (field === "status" && value === "NMC") changes.nmc_since = ts;
+    if (field === "status" && value === "FMC") changes.nmc_since = "";
     setRows(prev => prev.map(r => r.id === row.id ? { ...r, ...changes } : r));
-
     try {
-      const { error: updateErr } = await supabase.from("fleet").update(changes).eq("id", row.id);
-      if (updateErr) throw updateErr;
-
-      // Log history (non-blocking — don't fail the save if this errors)
-      supabase.from("fleet_history").insert({
-        unit: row.unit, type: row.type, squad: row.squad,
-        field_changed: field, old_value: oldValue, new_value: value, changed_by: user
-      }).then(({ error }) => { if (error) console.warn("History log failed:", error.message); });
-
+      const { error } = await supabase.from("fleet").update(changes).eq("id", row.id);
+      if (error) throw error;
+      supabase.from("fleet_history").insert({ unit: row.unit, type: row.type, squad: row.squad, field_changed: field, old_value: oldValue, new_value: value, changed_by: user })
+        .then(({ error }) => { if (error) console.warn("History log failed:", error.message); });
       return true;
     } catch (err) {
-      console.warn("Save failed, queuing for retry:", err.message);
       addToQueue({ id: row.id, changes });
       setPendingCount(loadQueue().length);
       return false;
     }
-  }, []);
+  }, [isViewer]);
 
   const commitName = () => {
     const n = nameInput.trim().toUpperCase() || "OPERATOR";
     setUsername(n); localStorage.setItem("outlaws-username", n); setShowPrompt(false);
   };
+
+  // Show PIN screen if not authenticated
+  if (!role) return <PinScreen onAuth={handleAuth} />;
 
   const filtered = rows.filter(r => {
     if (filterStatus !== "ALL" && r.status !== filterStatus) return false;
@@ -583,15 +731,14 @@ export default function OutlawsTracker() {
     { id: "history",   icon: "🕐", label: isMobile ? "LOG"       : "CHANGE LOG" },
   ];
 
-  // ── LOADING SCREEN ──────────────────────────────────────────────────────────
   if (loading) return (
     <div style={{ minHeight: "100vh", background: "#050d05", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 16 }}>
       <div style={{ fontSize: 32 }}>☠</div>
       <div style={{ color: "#00ff6a", fontFamily: "monospace", letterSpacing: 4, fontSize: 14 }}>LOADING...</div>
       {loadError && (
         <div style={{ textAlign: "center" }}>
-          <div style={{ color: "#ff4444", fontFamily: "monospace", fontSize: 12, marginBottom: 12 }}>⚠ Could not connect to database</div>
-          <button onClick={() => window.location.reload()} style={{ background: "#0a1a0a", border: "1px solid #2a4a2a", color: "#88cc88", fontFamily: "monospace", fontSize: 12, padding: "8px 20px", borderRadius: 6, cursor: "pointer", letterSpacing: 2 }}>RETRY</button>
+          <div style={{ color: "#ff4444", fontFamily: "monospace", fontSize: 12, marginBottom: 12 }}>⚠ Could not connect</div>
+          <button onClick={() => window.location.reload()} style={{ background: "#0a1a0a", border: "1px solid #2a4a2a", color: "#88cc88", fontFamily: "monospace", fontSize: 12, padding: "8px 20px", borderRadius: 6, cursor: "pointer" }}>RETRY</button>
         </div>
       )}
     </div>
@@ -600,8 +747,8 @@ export default function OutlawsTracker() {
   return (
     <div style={{ minHeight: "100vh", background: "#050d05", color: "#88cc88", fontFamily: "monospace" }}>
 
-      {/* NAME PROMPT */}
-      {showPrompt && (
+      {/* NAME PROMPT — only for editors */}
+      {showPrompt && !isViewer && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.92)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 999, padding: 20 }}>
           <div style={{ background: "#0a1a0a", border: "1px solid #2a4a2a", borderRadius: 12, padding: 32, textAlign: "center", maxWidth: 340, width: "100%" }}>
             <div style={{ fontSize: 32, marginBottom: 8 }}>🪖</div>
@@ -616,13 +763,21 @@ export default function OutlawsTracker() {
       {/* OFFLINE BANNER */}
       {!online && (
         <div style={{ background: "#2a1000", borderBottom: "1px solid #cc6600", padding: "6px 16px", fontSize: 11, color: "#ffaa44", fontFamily: "monospace", letterSpacing: 2, display: "flex", alignItems: "center", gap: 10 }}>
-          ⚠ NO CONNECTION — changes saved locally and will sync when back online
+          ⚠ NO CONNECTION — changes saved locally, will sync when back online
           {pendingCount > 0 && <span style={{ background: "#cc6600", color: "#000", fontSize: 10, fontWeight: 900, padding: "2px 8px", borderRadius: 3 }}>{pendingCount} PENDING</span>}
         </div>
       )}
       {online && pendingCount > 0 && (
         <div style={{ background: "#0a2a0a", borderBottom: "1px solid #00c44f", padding: "6px 16px", fontSize: 11, color: "#00ff6a", fontFamily: "monospace", letterSpacing: 2 }}>
           ✓ Back online — syncing {pendingCount} pending change{pendingCount > 1 ? "s" : ""}...
+        </div>
+      )}
+
+      {/* VIEWER BANNER */}
+      {isViewer && (
+        <div style={{ background: "#0a1a2a", borderBottom: "1px solid #2a4a8a", padding: "6px 16px", fontSize: 11, color: "#4a8aff", fontFamily: "monospace", letterSpacing: 2, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span>👁 VIEW ONLY MODE — no editing allowed</span>
+          <span onClick={() => { setRole(null); sessionStorage.removeItem("outlaws-role"); }} style={{ color: "#6aaaff", cursor: "pointer", textDecoration: "underline" }}>Switch Role</span>
         </div>
       )}
 
@@ -641,10 +796,10 @@ export default function OutlawsTracker() {
           ))}
         </div>
         <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
-          {/* Real connection indicator */}
           <div style={{ width: 8, height: 8, borderRadius: "50%", background: online ? "#00ff6a" : "#cc0000", boxShadow: online ? "0 0 6px #00ff6a" : "0 0 6px #cc0000", transition: "all 0.3s" }} />
-          <span style={{ fontSize: 10, color: online ? "#00ff6a" : "#cc0000", letterSpacing: 1 }}>{online ? "LIVE" : "OFFLINE"}</span>
-          <span style={{ fontSize: 11, color: "#00ff6a", fontWeight: 700, cursor: "pointer", marginLeft: 4 }} onClick={() => setShowPrompt(true)}>{username || "—"}</span>
+          <span style={{ fontSize: 10, color: online ? "#3a6a3a" : "#cc0000", letterSpacing: 1 }}>{online ? "LIVE" : "OFFLINE"}</span>
+          {!isViewer && <span style={{ fontSize: 11, color: "#00ff6a", fontWeight: 700, cursor: "pointer", marginLeft: 4 }} onClick={() => setShowPrompt(true)}>{username || "—"}</span>}
+          {isViewer  && <span style={{ fontSize: 11, color: "#4a8aff", fontWeight: 700, marginLeft: 4 }}>👁 VIEWER</span>}
         </div>
       </div>
 
@@ -672,8 +827,8 @@ export default function OutlawsTracker() {
         </div>
 
         {!isMobile && (
-          <div style={{ display: "grid", gridTemplateColumns: "36px 80px 72px 72px 130px 80px 1fr 148px 120px", background: "#050d05", borderBottom: "1px solid #1a3a1a", position: "sticky", top: 0, zIndex: 10 }}>
-            {["#","UNIT","TYPE","SQUAD","LOCATION","STATUS","FAULTS / DETAILS","LAST UPDATED","UPDATED BY"].map((h, i) => (
+          <div style={{ display: "grid", gridTemplateColumns: "36px 80px 72px 72px 130px 80px 110px 1fr 148px 120px", background: "#050d05", borderBottom: "1px solid #1a3a1a", position: "sticky", top: 0, zIndex: 10 }}>
+            {["#","UNIT","TYPE","SQUAD","LOCATION","STATUS","TIME DOWN","FAULTS / DETAILS","LAST UPDATED","UPDATED BY"].map((h, i) => (
               <div key={i} style={{ ...hCol, textAlign: i===0?"center":"left" }}>{h}</div>
             ))}
           </div>
@@ -681,8 +836,8 @@ export default function OutlawsTracker() {
 
         <div style={{ paddingBottom: isMobile ? 80 : 0 }}>
           {filtered.map(row => isMobile
-            ? <MobileCard key={row.id} row={row} onUpdate={handleUpdate} username={username} editingRowId={editingRowId} />
-            : <DesktopRow key={row.id} row={row} onUpdate={handleUpdate} username={username} editingRowId={editingRowId} />
+            ? <MobileCard key={row.id} row={row} onUpdate={handleUpdate} username={username} editingRowId={editingRowId} isViewer={isViewer} />
+            : <DesktopRow key={row.id} row={row} onUpdate={handleUpdate} username={username} editingRowId={editingRowId} isViewer={isViewer} />
           )}
           {filtered.length === 0 && <div style={{ textAlign: "center", padding: 48, color: "#2a5a2a", letterSpacing: 3 }}>NO RECORDS MATCH</div>}
         </div>
