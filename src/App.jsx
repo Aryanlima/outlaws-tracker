@@ -66,8 +66,8 @@ function PinScreen({ onAuth }) {
   useEffect(() => { inputRef.current?.focus(); }, []);
 
   const handleSubmit = () => {
+    if (role === "viewer") { onAuth("viewer"); return; }
     if (role === "editor" && pin === EDITOR_PIN) { onAuth("editor"); return; }
-    if (role === "viewer" && pin === VIEWER_PIN) { onAuth("viewer"); return; }
     setError("Incorrect PIN"); setPin("");
     setTimeout(() => setError(""), 2000);
   };
@@ -96,23 +96,27 @@ function PinScreen({ onAuth }) {
           ))}
         </div>
 
-        {/* PIN dots */}
-        <div style={{ display: "flex", gap: 10, justifyContent: "center", marginBottom: 20 }}>
-          {[0,1,2,3,4,5].slice(0, Math.max(4, pin.length + 1)).map((_, i) => (
-            <div key={i} style={{ width: 14, height: 14, borderRadius: "50%", background: i < pin.length ? "#00ff6a" : "#1a3a1a", border: "1px solid #2a4a2a", transition: "background 0.15s" }} />
-          ))}
-        </div>
+        {/* PIN dots — only for editor */}
+        {role === "editor" && (
+          <div style={{ display: "flex", gap: 10, justifyContent: "center", marginBottom: 20 }}>
+            {[0,1,2,3,4,5].slice(0, Math.max(4, pin.length + 1)).map((_, i) => (
+              <div key={i} style={{ width: 14, height: 14, borderRadius: "50%", background: i < pin.length ? "#00ff6a" : "#1a3a1a", border: "1px solid #2a4a2a", transition: "background 0.15s" }} />
+            ))}
+          </div>
+        )}
 
-        {/* Hidden input for keyboard */}
-        <input ref={inputRef} value={pin} onChange={e => setPin(e.target.value.replace(/\D/g,"").slice(0,6))} onKeyDown={handleKey} type="password" inputMode="numeric" style={{ position: "absolute", opacity: 0, pointerEvents: "none", width: 1, height: 1 }} />
+        {/* Hidden input for keyboard — only for editor */}
+        {role === "editor" && <input ref={inputRef} value={pin} onChange={e => setPin(e.target.value.replace(/\D/g,"").slice(0,6))} onKeyDown={handleKey} type="password" inputMode="numeric" style={{ position: "absolute", opacity: 0, pointerEvents: "none", width: 1, height: 1 }} />}
 
-        {/* Numpad */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginBottom: 12 }}>
-          {[1,2,3,4,5,6,7,8,9].map(d => digitBtn(String(d)))}
-          <div />
-          {digitBtn("0")}
-          <button onClick={() => setPin(p => p.slice(0,-1))} style={{ background: "#0a1a0a", border: "1px solid #2a4a2a", borderRadius: 8, color: "#ff4444", fontFamily: "monospace", fontSize: 18, cursor: "pointer", padding: "16px" }}>⌫</button>
-        </div>
+        {/* Numpad — only for editor */}
+        {role === "editor" && (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginBottom: 12 }}>
+            {[1,2,3,4,5,6,7,8,9].map(d => digitBtn(String(d)))}
+            <div />
+            {digitBtn("0")}
+            <button onClick={() => setPin(p => p.slice(0,-1))} style={{ background: "#0a1a0a", border: "1px solid #2a4a2a", borderRadius: 8, color: "#ff4444", fontFamily: "monospace", fontSize: 18, cursor: "pointer", padding: "16px" }}>⌫</button>
+          </div>
+        )}
 
         <button onClick={handleSubmit} style={{ background: role === "editor" ? "#00c44f" : "#2a4a8a", color: role === "editor" ? "#000" : "#fff", border: "none", borderRadius: 8, padding: "12px", fontFamily: "monospace", fontWeight: 700, fontSize: 14, letterSpacing: 2, cursor: "pointer", width: "100%", marginBottom: 8 }}>
           ENTER
@@ -849,3 +853,5 @@ export default function OutlawsTracker() {
     </div>
   );
 }
+
+
