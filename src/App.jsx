@@ -84,8 +84,8 @@ function PinScreen({ onAuth }) {
     <div style={{ minHeight: "100vh", background: "#08080f", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
       <div style={{ background: "#0e0e1c", border: "1px solid #2a4a2a", borderRadius: 16, padding: 32, textAlign: "center", maxWidth: 320, width: "100%" }}>
         <div style={{ fontSize: 36, marginBottom: 8 }}>☠</div>
-        <div style={{ fontSize: 16, fontWeight: 900, color: "#c8c8d8", letterSpacing: 3, marginBottom: 4 }}>SHADOW PLATOON</div>
-        <div style={{ fontSize: 10, color: "#5a5a7a", letterSpacing: 3, marginBottom: 24 }}>TRANSPORT · MAINTENANCE TRACKER</div>
+        <div style={{ fontSize: 20, fontWeight: 900, color: "#c8c8d8", letterSpacing: 4, marginBottom: 4 }}>SHADOW</div>
+        <div style={{ fontSize: 10, color: "#5a5a7a", letterSpacing: 3, marginBottom: 24 }}>MAINTENANCE TRACKER</div>
 
         {/* Role selector */}
         <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
