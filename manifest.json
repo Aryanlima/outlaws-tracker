@@ -1,12 +1,12 @@
 {
-  "name": "Outlaws Maintenance Tracker",
-  "short_name": "Outlaws",
-  "description": "Fleet maintenance tracker for Outlaws platoon",
+  "name": "Shadow Platoon Transport",
+  "short_name": "Shadow",
+  "description": "Shadow Platoon Transport - Fleet Maintenance Tracker",
   "start_url": "/",
   "display": "standalone",
   "orientation": "portrait-primary",
-  "theme_color": "#050d05",
-  "background_color": "#050d05",
+  "theme_color": "#08080f",
+  "background_color": "#08080f",
   "icons": [
     {
       "src": "/icon-192.png",
