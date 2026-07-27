@@ -3,20 +3,33 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="theme-color" content="#050d05" />
     <title>Outlaws Maintenance Tracker</title>
     <style>
-      * { margin: 0; padding: 0; box-sizing: border-box; }
-      html, body {
+      *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+      html {
+        background: #050d05;
+        overscroll-behavior: none;
+        -webkit-text-size-adjust: 100%;
+      }
+      body {
         background: #050d05;
         overscroll-behavior: none;
         -webkit-overflow-scrolling: touch;
-      }
-      /* Hide white bounce on iOS Safari */
-      body {
-        background-color: #050d05;
         min-height: 100vh;
         min-height: -webkit-fill-available;
+        /* Prevent double-tap zoom on mobile */
+        touch-action: manipulation;
       }
+      /* Prevent flash of white on load */
+      #root { background: #050d05; min-height: 100vh; }
+      /* Remove tap highlight globally */
+      * { -webkit-tap-highlight-color: transparent; }
+      /* Smooth font rendering */
+      body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
     </style>
   </head>
   <body>
@@ -24,4 +37,3 @@
     <script type="module" src="./src/main.jsx"></script>
   </body>
 </html>
- 
