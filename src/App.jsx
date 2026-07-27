@@ -326,7 +326,7 @@ function Dashboard({ rows, isMobile }) {
   const pct   = total ? Math.round((fmc / total) * 100) : 0;
 
   const bySquad    = ["1SQD","2SQD","3SQD","4SQD"].map(sq => { const s = rows.filter(r => r.squad === sq); return { sq, total: s.length, fmc: s.filter(r=>r.status==="FMC").length, nmc: s.filter(r=>r.status==="NMC").length }; });
-  const byType     = ["TRUCK","TRAILER","MATV","LMTV"].map(t => { const s = rows.filter(r => r.type === t); return { t, total: s.length, fmc: s.filter(r=>r.status==="FMC").length, nmc: s.filter(r=>r.status==="NMC").length }; }).filter(x => x.total > 0);
+  const byType     = ["PLS","TRAILER","LMTV TRL","MATV","LMTV","PO5025"].map(t => { const s = rows.filter(r => r.type === t); return { t, total: s.length, fmc: s.filter(r=>r.status==="FMC").length, nmc: s.filter(r=>r.status==="NMC").length }; }).filter(x => x.total > 0);
   const byLocation = LOCATIONS.map(l => { const s = rows.filter(r => r.location === l); return { l, total: s.length, fmc: s.filter(r=>r.status==="FMC").length, nmc: s.filter(r=>r.status==="NMC").length, cfg: LOCATION_CONFIG[l] }; }).filter(x => x.total > 0);
   const nmcList    = rows.filter(r => r.status === "NMC").sort((a,b) => { const da = new Date(a.nmc_since||0); const db = new Date(b.nmc_since||0); return da - db; });
 
