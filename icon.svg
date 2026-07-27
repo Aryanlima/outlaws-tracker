@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="80" fill="#050d05"/>
+  <rect width="512" height="512" rx="80" fill="#061006"/>
+  <!-- Skull outline -->
+  <ellipse cx="256" cy="220" rx="130" ry="120" fill="#00cc55"/>
+  <!-- Eyes -->
+  <ellipse cx="210" cy="210" rx="35" ry="40" fill="#050d05"/>
+  <ellipse cx="302" cy="210" rx="35" ry="40" fill="#050d05"/>
+  <!-- Nose -->
+  <ellipse cx="256" cy="265" rx="18" ry="14" fill="#050d05"/>
+  <!-- Jaw -->
+  <rect x="196" y="315" width="120" height="45" rx="10" fill="#00cc55"/>
+  <!-- Teeth -->
+  <rect x="210" y="315" width="20" height="25" rx="3" fill="#050d05"/>
+  <rect x="246" y="315" width="20" height="25" rx="3" fill="#050d05"/>
+  <rect x="282" y="315" width="20" height="25" rx="3" fill="#050d05"/>
+  <!-- Text -->
+  <text x="256" y="420" font-family="monospace" font-size="52" font-weight="900" fill="#00ff6a" text-anchor="middle" letter-spacing="4">OUTLAWS</text>
+</svg>
