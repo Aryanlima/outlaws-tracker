@@ -5,7 +5,7 @@ import { supabase } from "./supabase.js";
 const SQUADS    = ["1SQD", "2SQD", "3SQD", "4SQD"];
 const LOCATIONS = ["AMP", "BMP", "CMP", "MAINTENANCE BAY", "MISSION"];
 const STATUSES  = ["FMC", "NMC"];
-const TYPES     = ["TRUCK", "TRAILER", "MATV", "LMTV"];
+const TYPES     = ["PLS", "PLS TRL", "TRAILER", "MATV", "LMTV", "PO5025"];
 const HISTORY_PAGE_SIZE = 50;
 
 // ── PIN CONFIG — change these to your actual PINs ─────────────────────────────
@@ -23,7 +23,7 @@ const STATUS_CONFIG = {
   FMC: { badge: "#00c44f", text: "#00ff6a", bg: "rgba(0,196,79,0.08)" },
   NMC: { badge: "#cc0000", text: "#ff4444", bg: "rgba(204,0,0,0.08)" },
 };
-const TYPE_COLOR = { TRUCK: "#88cc88", TRAILER: "#5a8a5a", MATV: "#ff9900", LMTV: "#cc44ff" };
+const TYPE_COLOR = { PLS: "#88cc88", "PLS TRL": "#4a7a4a", TRAILER: "#3a6a3a", MATV: "#ff9900", LMTV: "#cc44ff", PO5025: "#00cccc", TRUCK: "#88cc88" };
 
 const inputStyle  = { background: "#0a1a0a", border: "1px solid #2a4a2a", borderRadius: 3, padding: "4px 8px", fontSize: 13, fontFamily: "monospace", outline: "none", width: "100%", boxSizing: "border-box", color: "#88cc88" };
 const selectStyle = { background: "#0a1a0a", color: "#88cc88", border: "1px solid #2a4a2a", borderRadius: 3, padding: "6px 8px", fontSize: 13, fontFamily: "monospace", outline: "none", width: "100%" };
@@ -823,7 +823,7 @@ export default function OutlawsTracker() {
             <button key={s} onClick={() => setFilterStatus(s)} style={{ background: filterStatus===s ? (s==="FMC"?"#00c44f":s==="NMC"?"#cc0000":"#2a4a2a") : "#0a1a0a", color: filterStatus===s?"#fff":"#5a8a5a", border: "1px solid #2a4a2a", borderRadius: 4, padding: "5px 12px", fontFamily: "monospace", fontWeight: 700, fontSize: 12, letterSpacing: 2, cursor: "pointer" }}>{s}</button>
           ))}
           <div style={{ width: 1, background: "#1a3a1a", height: 22 }} />
-          {["ALL","TRUCK","TRAILER","MATV","LMTV"].map(t => (
+          {["ALL","PLS","PLS TRL","TRAILER","MATV","LMTV","PO5025"].map(t => (
             <button key={t} onClick={() => setFilterType(t)} style={{ background: filterType===t ? "#1a3a1a" : "#0a1a0a", color: filterType===t ? (TYPE_COLOR[t]||"#88cc88") : "#4a6a4a", border: "1px solid #2a4a2a", borderRadius: 4, padding: "5px 10px", fontFamily: "monospace", fontSize: 11, cursor: "pointer", fontWeight: filterType===t?700:400 }}>{t}</button>
           ))}
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search..." style={{ ...inputStyle, flex: 1, minWidth: 80, maxWidth: 200, fontSize: 12 }} />
@@ -853,3 +853,4 @@ export default function OutlawsTracker() {
     </div>
   );
 }
+
