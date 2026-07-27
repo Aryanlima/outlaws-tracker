@@ -848,9 +848,9 @@ export default function OutlawsTracker() {
   const hCol  = { fontFamily: "monospace", fontSize: 10, color: "#4a7a4a", letterSpacing: 2, padding: "10px 6px" };
   const TABS  = [
     { id: "tracker",   icon: "📋", label: isMobile ? "TRACKER"   : "TRACKER" },
-    { id: "dashboard", icon: "📊", label: isMobile ? "DASH"      : "DASHBOARD" },
     { id: "squads",    icon: "🪖", label: isMobile ? "SQUADS"    : "SQUAD VIEW" },
     { id: "locations", icon: "📍", label: isMobile ? "LOCATIONS" : "LOCATION BREAKDOWN" },
+    { id: "dashboard", icon: "📊", label: isMobile ? "DASH"      : "DASHBOARD" },
     { id: "history",   icon: "🕐", label: isMobile ? "LOG"       : "CHANGE LOG" },
   ];
 
