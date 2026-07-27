@@ -605,7 +605,7 @@ function LocationBreakdown({ rows, isMobile }) {
 
 
 // ── SQUAD VIEW ────────────────────────────────────────────────────────────────
-function SquadView({ rows, isMobile }) {
+function SquadView({ rows, isMobile, onUpdate, username, editingRowId, isViewer }) {
   const [selectedSquad, setSelectedSquad] = useState(null);
 
   const squadData = ["1SQD","2SQD","3SQD","4SQD"].map(sq => {
@@ -689,22 +689,10 @@ function SquadView({ rows, isMobile }) {
                     {["FMC","NMC"].map(s => { const count = items.filter(u => u.status === s).length; if (!count) return null; return <span key={s} style={{ background: STATUS_CONFIG[s].badge, color: s==="FMC"?"#000":"#fff", fontSize: 10, fontWeight: 900, padding: "2px 8px", borderRadius: 3 }}>{s} {count}</span>; })}
                   </div>
                 </div>
-                <div style={{ padding: "10px 16px", display: "flex", flexDirection: "column", gap: 4 }}>
-                  {items.map(unit => {
-                    const sc  = STATUS_CONFIG[unit.status] || STATUS_CONFIG.FMC;
-                    const dur = nmcDuration(unit.nmc_since);
-                    const col = nmcColor(unit.nmc_since);
-                    return (
-                      <div key={unit.id} style={{ display: "flex", alignItems: "center", gap: 8, background: sc.bg, border: `1px solid ${sc.badge}33`, borderRadius: 6, padding: "8px 12px", flexWrap: "wrap" }}>
-                        <span style={{ fontFamily: "monospace", fontWeight: 900, fontSize: 14, color: sc.text, minWidth: 60 }}>{unit.unit}</span>
-                        <StatusBadge status={unit.status} />
-                        {unit.status === "NMC" && dur && <span style={{ color: col, fontFamily: "monospace", fontSize: 10, fontWeight: 700, background: `${col}22`, padding: "2px 7px", borderRadius: 3 }}>⏱ {dur}</span>}
-                        <span style={{ color: "#3a6a3a", fontFamily: "monospace", fontSize: 10 }}>{unit.location}</span>
-                        {unit.faults && <span style={{ color: unit.status==="NMC"?"#ff6666":"#4a7a4a", fontFamily: "monospace", fontSize: 11, flex: 1 }}>⚠ {unit.faults}</span>}
-                        {unit.last_updated && <span style={{ color: "#2a5a2a", fontFamily: "monospace", fontSize: 9, whiteSpace: "nowrap" }}>{unit.updated_by}</span>}
-                      </div>
-                    );
-                  })}
+                <div style={{ display: "flex", flexDirection: "column" }}>
+                  {items.map(unit => (
+                    <MobileCard key={unit.id} row={unit} onUpdate={onUpdate} username={username} editingRowId={editingRowId} isViewer={isViewer} />
+                  ))}
                 </div>
               </div>
             ))}
@@ -967,7 +955,7 @@ export default function OutlawsTracker() {
       </>}
 
       {tab === "dashboard"  && <Dashboard rows={rows} isMobile={isMobile} />}
-      {tab === "squads"     && <SquadView rows={rows} isMobile={isMobile} />}
+      {tab === "squads"     && <SquadView rows={rows} isMobile={isMobile} onUpdate={handleUpdate} username={username} editingRowId={editingRowId} isViewer={isViewer} />}
       {tab === "locations"  && <LocationBreakdown rows={rows} isMobile={isMobile} />}
       {tab === "history"    && <History isMobile={isMobile} />}
     </div>
