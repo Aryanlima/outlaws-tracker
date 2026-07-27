@@ -910,8 +910,8 @@ export default function ShadowTracker() {
       {/* HEADER */}
       <div style={{ background: "#0d0d18", borderBottom: "2px solid #1a3a1a", padding: isMobile ? "10px 14px" : "14px 24px", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
         <div>
-          <div style={{ fontSize: isMobile ? 14 : 18, fontWeight: 900, color: "#c8c8d8", letterSpacing: 3 }}>☠ SHADOW PLATOON</div>
-          <div style={{ fontSize: 9, color: "#6a6a8a", letterSpacing: 3 }}>TRANSPORT · MAINTENANCE TRACKER</div>
+          <div style={{ fontSize: isMobile ? 18 : 22, fontWeight: 900, color: "#c8c8d8", letterSpacing: 4 }}>☠ SHADOW</div>
+          <div style={{ fontSize: 9, color: "#6a6a8a", letterSpacing: 3 }}>MAINTENANCE TRACKER</div>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
           {[{ l: "FMC", v: stats.fmc, c: "#00c44f" }, { l: "NMC", v: stats.nmc, c: "#cc0000" }, { l: "TOTAL", v: stats.total, c: "#5a5a7a" }].map(s => (
@@ -976,4 +976,3 @@ export default function ShadowTracker() {
     </div>
   );
 }
-
