@@ -603,6 +603,124 @@ function LocationBreakdown({ rows, isMobile }) {
   );
 }
 
+
+// ── SQUAD VIEW ────────────────────────────────────────────────────────────────
+function SquadView({ rows, isMobile }) {
+  const [selectedSquad, setSelectedSquad] = useState(null);
+
+  const squadData = ["1SQD","2SQD","3SQD","4SQD"].map(sq => {
+    const units = rows.filter(r => r.squad === sq);
+    const fmc   = units.filter(r => r.status === "FMC").length;
+    const nmc   = units.filter(r => r.status === "NMC").length;
+    return { sq, units, fmc, nmc, total: units.length };
+  });
+
+  const selected = selectedSquad ? squadData.find(s => s.sq === selectedSquad) : null;
+
+  const byType = selected
+    ? ["PLS","TRAILER","MATV","LMTV","LMTV TRL","PO5025"]
+        .map(t => ({ t, items: selected.units.filter(u => u.type === t) }))
+        .filter(x => x.items.length > 0)
+    : [];
+
+  return (
+    <div style={{ padding: isMobile ? "12px" : "24px" }}>
+      <div style={{ fontSize: 11, color: "#3a6a3a", letterSpacing: 3, marginBottom: 20 }}>SQUAD BREAKDOWN</div>
+
+      {/* Squad selector cards */}
+      <div style={{ display: "flex", gap: 10, marginBottom: 24, flexWrap: "wrap" }}>
+        {squadData.map(({ sq, fmc, nmc, total }) => {
+          const isSelected = selectedSquad === sq;
+          const pct = total ? Math.round((fmc/total)*100) : 0;
+          return (
+            <div key={sq} onClick={() => setSelectedSquad(isSelected ? null : sq)}
+              style={{ background: isSelected ? "#0f2a0f" : "#0a1a0a", border: `2px solid ${isSelected ? "#00ff6a" : "#1a3a1a"}`, borderRadius: 12, padding: "16px 20px", flex: 1, minWidth: isMobile ? "calc(50% - 5px)" : 160, cursor: "pointer", transition: "all 0.2s" }}>
+              <div style={{ fontSize: 20, fontWeight: 900, color: isSelected ? "#00ff6a" : "#88cc88", fontFamily: "monospace", letterSpacing: 3, marginBottom: 10 }}>{sq}</div>
+              <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
+                <span style={{ background: "#00c44f", color: "#000", fontSize: 11, fontWeight: 900, padding: "3px 10px", borderRadius: 4 }}>FMC {fmc}</span>
+                {nmc > 0 && <span style={{ background: "#cc0000", color: "#fff", fontSize: 11, fontWeight: 900, padding: "3px 10px", borderRadius: 4 }}>NMC {nmc}</span>}
+              </div>
+              <div style={{ background: "#cc000044", borderRadius: 4, height: 6, overflow: "hidden", marginBottom: 6 }}>
+                <div style={{ background: "#00c44f", width: `${pct}%`, height: "100%", borderRadius: 4, transition: "width 0.5s" }} />
+              </div>
+              <div style={{ fontSize: 10, color: isSelected ? "#3a7a3a" : "#2a5a2a", fontFamily: "monospace" }}>{pct}% operational · {total} units</div>
+              {isSelected && <div style={{ fontSize: 10, color: "#00ff6a", fontFamily: "monospace", marginTop: 6, letterSpacing: 1 }}>▼ VIEWING</div>}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Selected squad detail */}
+      {selected && (
+        <div>
+          <div style={{ fontSize: 13, color: "#00ff6a", fontFamily: "monospace", fontWeight: 900, letterSpacing: 3, marginBottom: 16 }}>
+            {selected.sq} — {selected.total} UNITS
+          </div>
+
+          {/* NMC alert for this squad */}
+          {selected.nmc > 0 && (
+            <div style={{ background: "rgba(204,0,0,0.08)", border: "1px solid #3a1010", borderRadius: 8, padding: "10px 16px", marginBottom: 16 }}>
+              <div style={{ fontSize: 10, color: "#cc0000", letterSpacing: 2, marginBottom: 8 }}>⚠ NMC UNITS ({selected.nmc})</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                {selected.units.filter(u => u.status === "NMC").map(u => {
+                  const dur   = nmcDuration(u.nmc_since);
+                  const color = nmcColor(u.nmc_since);
+                  return (
+                    <div key={u.id} style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                      <span style={{ color: "#ff4444", fontFamily: "monospace", fontWeight: 900, fontSize: 13, minWidth: 60 }}>{u.unit}</span>
+                      <span style={{ color: TYPE_COLOR[u.type] || "#888", fontFamily: "monospace", fontSize: 10, fontWeight: 700 }}>{u.type}</span>
+                      {dur && <span style={{ color, fontFamily: "monospace", fontSize: 10, fontWeight: 700 }}>⏱ {dur}</span>}
+                      <span style={{ color: "#ff6666", fontFamily: "monospace", fontSize: 11, flex: 1 }}>{u.faults || "—"}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* All units by type */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            {byType.map(({ t, items }) => (
+              <div key={t} style={{ background: "#080f08", border: `1px solid ${TYPE_COLOR[t] || "#333"}33`, borderRadius: 10, overflow: "hidden" }}>
+                <div style={{ background: `${TYPE_COLOR[t] || "#333"}15`, borderBottom: `1px solid ${TYPE_COLOR[t] || "#333"}33`, padding: "8px 16px", display: "flex", alignItems: "center", gap: 10 }}>
+                  <span style={{ color: TYPE_COLOR[t] || "#888", fontWeight: 900, fontSize: 13, letterSpacing: 2, fontFamily: "monospace" }}>{t}</span>
+                  <span style={{ color: "#3a6a3a", fontSize: 10, fontFamily: "monospace" }}>{items.length} UNITS</span>
+                  <div style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
+                    {["FMC","NMC"].map(s => { const count = items.filter(u => u.status === s).length; if (!count) return null; return <span key={s} style={{ background: STATUS_CONFIG[s].badge, color: s==="FMC"?"#000":"#fff", fontSize: 10, fontWeight: 900, padding: "2px 8px", borderRadius: 3 }}>{s} {count}</span>; })}
+                  </div>
+                </div>
+                <div style={{ padding: "10px 16px", display: "flex", flexDirection: "column", gap: 4 }}>
+                  {items.map(unit => {
+                    const sc  = STATUS_CONFIG[unit.status] || STATUS_CONFIG.FMC;
+                    const dur = nmcDuration(unit.nmc_since);
+                    const col = nmcColor(unit.nmc_since);
+                    return (
+                      <div key={unit.id} style={{ display: "flex", alignItems: "center", gap: 8, background: sc.bg, border: `1px solid ${sc.badge}33`, borderRadius: 6, padding: "8px 12px", flexWrap: "wrap" }}>
+                        <span style={{ fontFamily: "monospace", fontWeight: 900, fontSize: 14, color: sc.text, minWidth: 60 }}>{unit.unit}</span>
+                        <StatusBadge status={unit.status} />
+                        {unit.status === "NMC" && dur && <span style={{ color: col, fontFamily: "monospace", fontSize: 10, fontWeight: 700, background: `${col}22`, padding: "2px 7px", borderRadius: 3 }}>⏱ {dur}</span>}
+                        <span style={{ color: "#3a6a3a", fontFamily: "monospace", fontSize: 10 }}>{unit.location}</span>
+                        {unit.faults && <span style={{ color: unit.status==="NMC"?"#ff6666":"#4a7a4a", fontFamily: "monospace", fontSize: 11, flex: 1 }}>⚠ {unit.faults}</span>}
+                        {unit.last_updated && <span style={{ color: "#2a5a2a", fontFamily: "monospace", fontSize: 9, whiteSpace: "nowrap" }}>{unit.updated_by}</span>}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {!selectedSquad && (
+        <div style={{ textAlign: "center", padding: 40, color: "#2a5a2a", fontFamily: "monospace", fontSize: 12, letterSpacing: 2 }}>
+          ↑ TAP A SQUAD TO VIEW ITS VEHICLES
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── MAIN APP ──────────────────────────────────────────────────────────────────
 export default function OutlawsTracker() {
   const [role,         setRole]         = useState(() => sessionStorage.getItem("outlaws-role") || null);
@@ -731,6 +849,7 @@ export default function OutlawsTracker() {
   const TABS  = [
     { id: "tracker",   icon: "📋", label: isMobile ? "TRACKER"   : "TRACKER" },
     { id: "dashboard", icon: "📊", label: isMobile ? "DASH"      : "DASHBOARD" },
+    { id: "squads",    icon: "🪖", label: isMobile ? "SQUADS"    : "SQUAD VIEW" },
     { id: "locations", icon: "📍", label: isMobile ? "LOCATIONS" : "LOCATION BREAKDOWN" },
     { id: "history",   icon: "🕐", label: isMobile ? "LOG"       : "CHANGE LOG" },
   ];
@@ -848,6 +967,7 @@ export default function OutlawsTracker() {
       </>}
 
       {tab === "dashboard"  && <Dashboard rows={rows} isMobile={isMobile} />}
+      {tab === "squads"     && <SquadView rows={rows} isMobile={isMobile} />}
       {tab === "locations"  && <LocationBreakdown rows={rows} isMobile={isMobile} />}
       {tab === "history"    && <History isMobile={isMobile} />}
     </div>
