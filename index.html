@@ -15,9 +15,32 @@
     <title>Outlaws Tracker</title>
     <style>
       *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-      html { background: #050d05; overscroll-behavior: none; -webkit-text-size-adjust: 100%; }
-      body { background: #050d05; overscroll-behavior: none; -webkit-overflow-scrolling: touch; min-height: 100vh; min-height: -webkit-fill-available; touch-action: manipulation; }
-      #root { background: #050d05; min-height: 100vh; }
+
+      html {
+        background: #050d05;
+        overscroll-behavior: none;
+        -webkit-text-size-adjust: 100%;
+      }
+
+      body {
+        background: #050d05;
+        overscroll-behavior: none;
+        -webkit-overflow-scrolling: touch;
+        min-height: 100vh;
+        min-height: -webkit-fill-available;
+        touch-action: manipulation;
+        /* Safe area padding for iPhone notch/status bar */
+        padding-top: env(safe-area-inset-top);
+        padding-bottom: env(safe-area-inset-bottom);
+        padding-left: env(safe-area-inset-left);
+        padding-right: env(safe-area-inset-right);
+      }
+
+      #root {
+        background: #050d05;
+        min-height: 100vh;
+      }
+
       * { -webkit-tap-highlight-color: transparent; }
       body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
     </style>
@@ -29,7 +52,7 @@
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
           navigator.serviceWorker.register('/sw.js')
-            .then(reg => console.log('SW registered'))
+            .then(() => console.log('SW registered'))
             .catch(err => console.log('SW failed:', err));
         });
       }
