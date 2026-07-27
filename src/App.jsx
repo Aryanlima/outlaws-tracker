@@ -29,7 +29,7 @@ const inputStyle  = { background: "#0e0e1c", border: "1px solid #2a4a2a", border
 const selectStyle = { background: "#0e0e1c", color: "#a0a0c0", border: "1px solid #2a4a2a", borderRadius: 3, padding: "6px 8px", fontSize: 13, fontFamily: "monospace", outline: "none", width: "100%", WebkitTapHighlightColor: "transparent" };
 
 // ── OFFLINE QUEUE ─────────────────────────────────────────────────────────────
-const QUEUE_KEY  = "outlaws-pending-updates";
+const QUEUE_KEY  = "shadow-pending-updates";
 const loadQueue  = () => { try { return JSON.parse(localStorage.getItem(QUEUE_KEY) || "[]"); } catch { return []; } };
 const saveQueue  = (q) => localStorage.setItem(QUEUE_KEY, JSON.stringify(q));
 const addToQueue = (item) => saveQueue([...loadQueue(), item]);
@@ -84,8 +84,8 @@ function PinScreen({ onAuth }) {
     <div style={{ minHeight: "100vh", background: "#08080f", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
       <div style={{ background: "#0e0e1c", border: "1px solid #2a4a2a", borderRadius: 16, padding: 32, textAlign: "center", maxWidth: 320, width: "100%" }}>
         <div style={{ fontSize: 36, marginBottom: 8 }}>☠</div>
-        <div style={{ fontSize: 20, fontWeight: 900, color: "#00ff6a", letterSpacing: 4, marginBottom: 4 }}>OUTLAWS</div>
-        <div style={{ fontSize: 10, color: "#4a4a6a", letterSpacing: 3, marginBottom: 24 }}>MAINTENANCE TRACKER</div>
+        <div style={{ fontSize: 16, fontWeight: 900, color: "#c8c8d8", letterSpacing: 3, marginBottom: 4 }}>SHADOW PLATOON</div>
+        <div style={{ fontSize: 10, color: "#5a5a7a", letterSpacing: 3, marginBottom: 24 }}>TRANSPORT · MAINTENANCE TRACKER</div>
 
         {/* Role selector */}
         <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
@@ -725,17 +725,17 @@ function SquadView({ rows, isMobile, onUpdate, username, editingRowId, isViewer 
 }
 
 // ── MAIN APP ──────────────────────────────────────────────────────────────────
-export default function OutlawsTracker() {
-  const [role,         setRole]         = useState(() => sessionStorage.getItem("outlaws-role") || null);
+export default function ShadowTracker() {
+  const [role,         setRole]         = useState(() => sessionStorage.getItem("shadow-role") || null);
   const [rows,         setRows]         = useState([]);
   const [loading,      setLoading]      = useState(true);
   const [loadError,    setLoadError]    = useState(false);
-  const [username,     setUsername]     = useState(() => localStorage.getItem("outlaws-username") || "");
+  const [username,     setUsername]     = useState(() => localStorage.getItem("shadow-username") || "");
   const [tab,          setTab]          = useState("tracker");
   const [filterStatus, setFilterStatus] = useState("ALL");
   const [filterType,   setFilterType]   = useState("ALL");
   const [search,       setSearch]       = useState("");
-  const [showPrompt,   setShowPrompt]   = useState(!localStorage.getItem("outlaws-username"));
+  const [showPrompt,   setShowPrompt]   = useState(!localStorage.getItem("shadow-username"));
   const [nameInput,    setNameInput]    = useState("");
   const [isMobile,     setIsMobile]     = useState(window.innerWidth < 768);
   const [online,       setOnline]       = useState(true);
@@ -748,9 +748,9 @@ export default function OutlawsTracker() {
 
   const handleAuth = (r) => {
     setRole(r);
-    sessionStorage.setItem("outlaws-role", r);
+    sessionStorage.setItem("shadow-role", r);
     if (r === "viewer" && !username) {
-      setUsername("VIEWER"); localStorage.setItem("outlaws-username", "VIEWER"); setShowPrompt(false);
+      setUsername("VIEWER"); localStorage.setItem("shadow-username", "VIEWER"); setShowPrompt(false);
     }
   };
 
@@ -834,7 +834,7 @@ export default function OutlawsTracker() {
 
   const commitName = () => {
     const n = nameInput.trim().toUpperCase() || "OPERATOR";
-    setUsername(n); localStorage.setItem("outlaws-username", n); setShowPrompt(false);
+    setUsername(n); localStorage.setItem("shadow-username", n); setShowPrompt(false);
   };
 
   // Show PIN screen if not authenticated
@@ -903,7 +903,7 @@ export default function OutlawsTracker() {
       {isViewer && (
         <div style={{ background: "#0e0e1e", borderBottom: "1px solid #2a4a8a", padding: "6px 16px", fontSize: 11, color: "#8888cc", fontFamily: "monospace", letterSpacing: 2, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <span>👁 VIEW ONLY MODE — no editing allowed</span>
-          <span onClick={() => { setRole(null); sessionStorage.removeItem("outlaws-role"); }} style={{ color: "#aaaaee", cursor: "pointer", textDecoration: "underline" }}>Switch Role</span>
+          <span onClick={() => { setRole(null); sessionStorage.removeItem("shadow-role"); }} style={{ color: "#aaaaee", cursor: "pointer", textDecoration: "underline" }}>Switch Role</span>
         </div>
       )}
 
@@ -976,3 +976,4 @@ export default function OutlawsTracker() {
     </div>
   );
 }
+
