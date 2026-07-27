@@ -25,8 +25,8 @@ const STATUS_CONFIG = {
 };
 const TYPE_COLOR = { PLS: "#88cc88", TRAILER: "#4a7a4a", "LMTV TRL": "#8844cc", MATV: "#ff9900", LMTV: "#cc44ff", PO5025: "#00cccc", TRUCK: "#88cc88" };
 
-const inputStyle  = { background: "#0a1a0a", border: "1px solid #2a4a2a", borderRadius: 3, padding: "4px 8px", fontSize: 13, fontFamily: "monospace", outline: "none", width: "100%", boxSizing: "border-box", color: "#88cc88" };
-const selectStyle = { background: "#0a1a0a", color: "#88cc88", border: "1px solid #2a4a2a", borderRadius: 3, padding: "6px 8px", fontSize: 13, fontFamily: "monospace", outline: "none", width: "100%" };
+const inputStyle  = { background: "#0a1a0a", border: "1px solid #2a4a2a", borderRadius: 3, padding: "4px 8px", fontSize: 13, fontFamily: "monospace", outline: "none", width: "100%", boxSizing: "border-box", color: "#88cc88", WebkitTapHighlightColor: "transparent" };
+const selectStyle = { background: "#0a1a0a", color: "#88cc88", border: "1px solid #2a4a2a", borderRadius: 3, padding: "6px 8px", fontSize: 13, fontFamily: "monospace", outline: "none", width: "100%", WebkitTapHighlightColor: "transparent" };
 
 // ── OFFLINE QUEUE ─────────────────────────────────────────────────────────────
 const QUEUE_KEY  = "outlaws-pending-updates";
@@ -220,7 +220,15 @@ const MobileCard = memo(function MobileCard({ row, onUpdate, username, editingRo
       <div>
         <div style={{ fontSize: 9, color: "#3a6a3a", letterSpacing: 2, marginBottom: 4 }}>FAULTS / DETAILS</div>
         {editing === "faults" && !isViewer
-          ? <input ref={faultsRef} autoFocus value={localFaults} onChange={e => setLocalFaults(e.target.value)} onBlur={() => { save("faults", localFaults); stopEdit(); }} onKeyDown={e => { if (e.key === "Enter") { save("faults", localFaults); stopEdit(); } }} placeholder="Enter fault description..." style={{ ...inputStyle, color: isNMC ? "#ff8888" : "#88cc88", background: isNMC ? "#2a0a0a" : "#0a1a0a", padding: "8px 10px" }} />
+          ? <input
+              ref={faultsRef}
+              autoFocus
+              defaultValue={localFaults}
+              onBlur={e => { const v = e.target.value; setLocalFaults(v); save("faults", v); stopEdit(); }}
+              onKeyDown={e => { if (e.key === "Enter") { const v = e.target.value; setLocalFaults(v); save("faults", v); stopEdit(); } if (e.key === "Escape") stopEdit(); }}
+              placeholder="Enter fault description..."
+              style={{ ...inputStyle, color: isNMC ? "#ff8888" : "#88cc88", background: isNMC ? "#2a0a0a" : "#0a1a0a", padding: "8px 10px" }}
+            />
           : <div onClick={() => startEdit("faults")} style={{ color: isNMC ? "#ff6666" : "#3a6a3a", fontFamily: "monospace", fontSize: 12, cursor: isViewer ? "default" : "pointer", padding: "8px 10px", background: "#0a1a0a", borderRadius: 4, border: `1px solid ${isNMC ? "#4a1010" : "#1a2a1a"}`, fontStyle: localFaults ? "normal" : "italic", minHeight: 36 }}>{localFaults || (isNMC ? (isViewer ? "No fault listed" : "Tap to add fault...") : "— No faults —")}</div>}
       </div>
       {saveError && <SaveError onRetry={() => { setSaveError(false); save("faults", localFaults); }} />}
@@ -293,7 +301,14 @@ const DesktopRow = memo(function DesktopRow({ row, onUpdate, username, editingRo
       </div>
       <div style={{ ...cell, paddingTop: saveError ? 4 : 0, paddingBottom: saveError ? 4 : 0 }}>
         {editing === "faults" && !isViewer
-          ? <input ref={faultsRef} autoFocus value={localFaults} onChange={e => setLocalFaults(e.target.value)} onBlur={() => { save("faults", localFaults); stopEdit(); }} onKeyDown={e => { if (e.key === "Enter") { save("faults", localFaults); stopEdit(); } }} style={{ ...inputStyle, color: isNMC ? "#ff8888" : "#88cc88", background: isNMC ? "#2a0a0a" : "#0a1a0a" }} />
+          ? <input
+              ref={faultsRef}
+              autoFocus
+              defaultValue={localFaults}
+              onBlur={e => { const v = e.target.value; setLocalFaults(v); save("faults", v); stopEdit(); }}
+              onKeyDown={e => { if (e.key === "Enter") { const v = e.target.value; setLocalFaults(v); save("faults", v); stopEdit(); } if (e.key === "Escape") stopEdit(); }}
+              style={{ ...inputStyle, color: isNMC ? "#ff8888" : "#88cc88", background: isNMC ? "#2a0a0a" : "#0a1a0a" }}
+            />
           : <span onClick={() => startEdit("faults")} style={{ color: isNMC ? "#ff6666" : "#3a6a3a", cursor: isViewer ? "default" : "pointer", fontStyle: localFaults ? "normal" : "italic", opacity: localFaults ? 1 : 0.5, fontSize: 12 }}>{localFaults || (isNMC ? "Click to add fault..." : "—")}</span>}
         {saveError && <SaveError onRetry={() => { setSaveError(false); save("faults", localFaults); }} />}
       </div>
