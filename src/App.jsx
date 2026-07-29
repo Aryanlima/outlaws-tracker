@@ -1,23 +1,22 @@
 import { useState, useEffect, useRef, useCallback, memo } from "react";
 import { supabase } from "./supabase.js";
 
-// ── CONSTANTS ─────────────────────────────────────────────────────────────────
-const SQUADS    = ["1SQD", "2SQD", "3SQD", "4SQD"];
-const LOCATIONS = ["AMP", "BMP", "CMP", "MAINTENANCE BAY", "MISSION"];
-const STATUSES  = ["FMC", "NMC"];
-const TYPES     = ["PLS", "TRAILER", "LMTV TRL", "MATV", "LMTV", "PO5025"];
-const HISTORY_PAGE_SIZE = 50;
+const SQUADS = ["1SQD", "2SQD", "3SQD", "4SQD"];
+const LOCATIONS = ["AMP", "BMP", "CMP", "MAINTENANCE BAY", "MISSION", "WARRIOR LUBE"];
+const STATUSES = ["FMC", "NMC"];
+const TYPES = ["PLS", "TRAILER", "LMTV TRL", "MATV", "LMTV", "PO5025"];
+const PAGE_SIZE = 50;
 
-// ── PIN CONFIG — change these to your actual PINs ─────────────────────────────
-const VIEWER_PIN = "1234";
+const VIEWER_PIN = "1234"; // TODO change before showing this to command lol
 const EDITOR_PIN = "5678";
 
 const LOCATION_CONFIG = {
-  AMP:               { color: "#cc44ff", icon: "⚙️",  desc: "Area Motor Pool" },
-  BMP:               { color: "#ff9900", icon: "🔧", desc: "Battalion Motor Pool" },
-  CMP:               { color: "#00aaff", icon: "🏠", desc: "Company Motor Pool" },
+  AMP: { color: "#cc44ff", icon: "⚙️", desc: "Area Motor Pool" },
+  BMP: { color: "#ff9900", icon: "🔧", desc: "Battalion Motor Pool" },
+  CMP: { color: "#00aaff", icon: "🏠", desc: "Company Motor Pool" },
   "MAINTENANCE BAY": { color: "#ff6600", icon: "🛠️", desc: "Maintenance Bay" },
-  MISSION:           { color: "#ffd700", icon: "🎯", desc: "On Mission" },
+  MISSION: { color: "#ffd700", icon: "🎯", desc: "On Mission" },
+  "WARRIOR LUBE": { color: "#00ffaa", icon: "🛢️", desc: "Warrior Lube" },
 };
 const STATUS_CONFIG = {
   FMC: { badge: "#00c44f", text: "#00ff6a", bg: "rgba(0,196,79,0.08)" },
@@ -25,22 +24,26 @@ const STATUS_CONFIG = {
 };
 const TYPE_COLOR = { PLS: "#a0a0c0", TRAILER: "#5a5a7a", "LMTV TRL": "#8844cc", MATV: "#ff9900", LMTV: "#cc44ff", PO5025: "#00cccc", TRUCK: "#a0a0c0" };
 
-const inputStyle  = { background: "#0e0e1c", border: "1px solid #2a4a2a", borderRadius: 3, padding: "4px 8px", fontSize: 13, fontFamily: "monospace", outline: "none", width: "100%", boxSizing: "border-box", color: "#a0a0c0", WebkitTapHighlightColor: "transparent" };
+const inputStyle = { background: "#0e0e1c", border: "1px solid #2a4a2a", borderRadius: 3, padding: "4px 8px", fontSize: 13, fontFamily: "monospace", outline: "none", width: "100%", boxSizing: "border-box", color: "#a0a0c0", WebkitTapHighlightColor: "transparent" };
 const selectStyle = { background: "#0e0e1c", color: "#a0a0c0", border: "1px solid #2a4a2a", borderRadius: 3, padding: "6px 8px", fontSize: 13, fontFamily: "monospace", outline: "none", width: "100%", WebkitTapHighlightColor: "transparent" };
 
-// ── OFFLINE QUEUE ─────────────────────────────────────────────────────────────
-const QUEUE_KEY  = "shadow-pending-updates";
-const loadQueue  = () => { try { return JSON.parse(localStorage.getItem(QUEUE_KEY) || "[]"); } catch { return []; } };
-const saveQueue  = (q) => localStorage.setItem(QUEUE_KEY, JSON.stringify(q));
+const QUEUE_KEY = "shadow-pending-updates";
+function loadQueue() {
+  try {
+    return JSON.parse(localStorage.getItem(QUEUE_KEY) || "[]");
+  } catch {
+    return [];
+  }
+}
+const saveQueue = (q) => localStorage.setItem(QUEUE_KEY, JSON.stringify(q));
 const addToQueue = (item) => saveQueue([...loadQueue(), item]);
 
-// ── HELPERS ───────────────────────────────────────────────────────────────────
 function nmcDuration(nmcSince) {
   if (!nmcSince) return null;
   const start = new Date(nmcSince);
   if (isNaN(start)) return null;
-  const diff  = Date.now() - start.getTime();
-  const days  = Math.floor(diff / 86400000);
+  const diff = Date.now() - start.getTime();
+  const days = Math.floor(diff / 86400000);
   const hours = Math.floor((diff % 86400000) / 3600000);
   if (days > 0) return `${days}d ${hours}h`;
   if (hours > 0) return `${hours}h`;
@@ -50,17 +53,16 @@ function nmcDuration(nmcSince) {
 function nmcColor(nmcSince) {
   if (!nmcSince) return "#cc0000";
   const days = (Date.now() - new Date(nmcSince).getTime()) / 86400000;
-  if (days >= 7)  return "#ff0000";
-  if (days >= 3)  return "#ff6600";
-  if (days >= 1)  return "#ffaa00";
+  if (days >= 7) return "#ff0000";
+  if (days >= 3) return "#ff6600";
+  if (days >= 1) return "#ffaa00";
   return "#ffcc44";
 }
 
-// ── PIN SCREEN ────────────────────────────────────────────────────────────────
 function PinScreen({ onAuth }) {
-  const [pin,     setPin]     = useState("");
-  const [error,   setError]   = useState("");
-  const [role,    setRole]    = useState("editor"); // "viewer" | "editor"
+  const [pin, setPin] = useState("");
+  const [error, setError] = useState("");
+  const [role, setRole] = useState("editor"); // "viewer" | "editor"
   const inputRef = useRef(null);
 
   useEffect(() => { inputRef.current?.focus(); }, []);
@@ -68,7 +70,8 @@ function PinScreen({ onAuth }) {
   const handleSubmit = () => {
     if (role === "viewer") { onAuth("viewer"); return; }
     if (role === "editor" && pin === EDITOR_PIN) { onAuth("editor"); return; }
-    setError("Incorrect PIN"); setPin("");
+    setError("Incorrect PIN");
+    setPin("");
     setTimeout(() => setError(""), 2000);
   };
 
@@ -131,14 +134,13 @@ function PinScreen({ onAuth }) {
   );
 }
 
-// ── SHARED COMPONENTS ─────────────────────────────────────────────────────────
 function StatusBadge({ status }) {
   const cfg = STATUS_CONFIG[status] || STATUS_CONFIG.FMC;
   return <span style={{ background: cfg.badge, color: "#fff", fontFamily: "monospace", fontWeight: 900, fontSize: 12, letterSpacing: 2, padding: "4px 12px", borderRadius: 4, display: "inline-block", minWidth: 50, textAlign: "center" }}>{status || "FMC"}</span>;
 }
 
 function NmcTimer({ nmcSince }) {
-  const dur   = nmcDuration(nmcSince);
+  const dur = nmcDuration(nmcSince);
   const color = nmcColor(nmcSince);
   if (!dur) return null;
   return <span style={{ background: `${color}22`, border: `1px solid ${color}66`, color, fontFamily: "monospace", fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 4, letterSpacing: 1, whiteSpace: "nowrap" }}>⏱ {dur}</span>;
@@ -153,34 +155,35 @@ function SaveError({ onRetry }) {
   );
 }
 
-// ── MOBILE CARD ───────────────────────────────────────────────────────────────
-const MobileCard = memo(function MobileCard({ row, onUpdate, username, editingRowId, isViewer }) {
-  const [editing,       setEditing]       = useState(null);
-  const [localStatus,   setLocalStatus]   = useState(row.status);
-  const [localFaults,   setLocalFaults]   = useState(row.faults);
+const MobileCard = memo(function MobileCard({ row, onUpdate, username, editingId, isViewer }) {
+  const [editing, setEditing] = useState(null);
+  const [localStatus, setLocalStatus] = useState(row.status);
+  const [localFaults, setLocalFaults] = useState(row.faults);
   const [localLocation, setLocalLocation] = useState(row.location);
-  const [localSquad,    setLocalSquad]    = useState(row.squad);
-  const [saveError,     setSaveError]     = useState(false);
+  const [localSquad, setLocalSquad] = useState(row.squad);
+  const [saveError, setSaveError] = useState(false);
   const faultsRef = useRef(null);
 
   useEffect(() => {
     if (editing) return;
-    setLocalStatus(row.status); setLocalFaults(row.faults);
-    setLocalLocation(row.location); setLocalSquad(row.squad);
+    setLocalStatus(row.status);
+    setLocalFaults(row.faults);
+    setLocalLocation(row.location);
+    setLocalSquad(row.squad);
   }, [row, editing]);
 
-  const startEdit = (field) => { if (isViewer) return; if (editingRowId) editingRowId.current = row.id; setEditing(field); };
-  const stopEdit  = ()       => { if (editingRowId) editingRowId.current = null; setEditing(null); };
+  const startEdit = (field) => { if (isViewer) return; if (editingId) editingId.current = row.id; setEditing(field); };
+  const stopEdit = () => { if (editingId) editingId.current = null; setEditing(null); };
 
-  const isNMC    = localStatus === "NMC";
-  const sc       = STATUS_CONFIG[localStatus] || STATUS_CONFIG.FMC;
+  const isNMC = localStatus === "NMC";
+  const sc = STATUS_CONFIG[localStatus] || STATUS_CONFIG.FMC;
   const locColor = LOCATION_CONFIG[localLocation]?.color || "#6a9a6a";
 
   const save = useCallback(async (field, value) => {
     setSaveError(false);
     const now = new Date();
-    const ts  = `${now.getMonth()+1}/${now.getDate()}/${now.getFullYear()} ${now.toLocaleTimeString("en-US",{hour12:false})}`;
-    const ok  = await onUpdate(row, field, value, ts, username || "OPERATOR");
+    const ts = `${now.getMonth()+1}/${now.getDate()}/${now.getFullYear()} ${now.toLocaleTimeString("en-US",{hour12:false})}`;
+    const ok = await onUpdate(row, field, value, ts, username || "OPERATOR");
     if (!ok) setSaveError(true);
   }, [row, onUpdate, username]);
 
@@ -196,6 +199,7 @@ const MobileCard = memo(function MobileCard({ row, onUpdate, username, editingRo
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
         <span style={{ color: "#4a4a6a", fontSize: 11, fontFamily: "monospace", minWidth: 20 }}>{row.line}</span>
         <span style={{ color: sc.text, fontWeight: 900, fontSize: 16, fontFamily: "monospace", letterSpacing: 1 }}>{row.unit}</span>
+        {row.jbcp && <span title="JBCP equipped" style={{ fontSize: 13 }}>📡</span>}
         <span style={{ color: TYPE_COLOR[row.type] || "#5a5a7a", fontSize: 10, fontFamily: "monospace", background: "#131320", padding: "2px 8px", borderRadius: 4, fontWeight: 700 }}>{row.type}</span>
         <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6 }}>
           {isNMC && <NmcTimer nmcSince={row.nmc_since} />}
@@ -237,48 +241,53 @@ const MobileCard = memo(function MobileCard({ row, onUpdate, username, editingRo
   );
 });
 
-// ── DESKTOP ROW ───────────────────────────────────────────────────────────────
-const DesktopRow = memo(function DesktopRow({ row, onUpdate, username, editingRowId, isViewer }) {
-  const [editing,       setEditing]       = useState(null);
-  const [localStatus,   setLocalStatus]   = useState(row.status);
-  const [localFaults,   setLocalFaults]   = useState(row.faults);
+const DesktopRow = memo(function DesktopRow({ row, onUpdate, username, editingId, isViewer }) {
+  const [editing, setEditing] = useState(null);
+  const [localStatus, setLocalStatus] = useState(row.status);
+  const [localFaults, setLocalFaults] = useState(row.faults);
   const [localLocation, setLocalLocation] = useState(row.location);
-  const [localSquad,    setLocalSquad]    = useState(row.squad);
-  const [saveError,     setSaveError]     = useState(false);
+  const [localSquad, setLocalSquad] = useState(row.squad);
+  const [saveError, setSaveError] = useState(false);
   const faultsRef = useRef(null);
 
   useEffect(() => {
     if (editing) return;
-    setLocalStatus(row.status); setLocalFaults(row.faults);
-    setLocalLocation(row.location); setLocalSquad(row.squad);
+    setLocalStatus(row.status);
+    setLocalFaults(row.faults);
+    setLocalLocation(row.location);
+    setLocalSquad(row.squad);
   }, [row, editing]);
 
-  const startEdit = (field) => { if (isViewer) return; if (editingRowId) editingRowId.current = row.id; setEditing(field); };
-  const stopEdit  = ()       => { if (editingRowId) editingRowId.current = null; setEditing(null); };
+  const startEdit = (field) => { if (isViewer) return; if (editingId) editingId.current = row.id; setEditing(field); };
+  const stopEdit = () => { if (editingId) editingId.current = null; setEditing(null); };
 
-  const sc       = STATUS_CONFIG[localStatus] || STATUS_CONFIG.FMC;
-  const isNMC    = localStatus === "NMC";
+  const sc = STATUS_CONFIG[localStatus] || STATUS_CONFIG.FMC;
+  const isNMC = localStatus === "NMC";
   const locColor = LOCATION_CONFIG[localLocation]?.color || "#6a9a6a";
-  const cell     = { padding: "0 6px", fontFamily: "monospace", fontSize: 12 };
+  const cell = { padding: "0 6px", fontFamily: "monospace", fontSize: 12 };
 
   const save = useCallback(async (field, value) => {
     setSaveError(false);
     const now = new Date();
-    const ts  = `${now.getMonth()+1}/${now.getDate()}/${now.getFullYear()} ${now.toLocaleTimeString("en-US",{hour12:false})}`;
-    const ok  = await onUpdate(row, field, value, ts, username || "OPERATOR");
+    const ts = `${now.getMonth()+1}/${now.getDate()}/${now.getFullYear()} ${now.toLocaleTimeString("en-US",{hour12:false})}`;
+    const ok = await onUpdate(row, field, value, ts, username || "OPERATOR");
     if (!ok) setSaveError(true);
   }, [row, onUpdate, username]);
 
   const handleStatus = (val) => {
-    setLocalStatus(val); save("status", val);
+    setLocalStatus(val);
+    save("status", val);
     if (val === "NMC") setTimeout(() => { startEdit("faults"); faultsRef.current?.focus(); }, 80);
     else stopEdit();
   };
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "36px 80px 72px 72px 130px 80px 110px 1fr 148px 120px", alignItems: "center", borderBottom: `1px solid ${isNMC ? "#3a1010" : "#1a1a28"}`, background: isNMC ? "rgba(255,40,40,0.06)" : "transparent", minHeight: 42 }}>
+    <div style={{ display: "grid", gridTemplateColumns: "36px 95px 72px 72px 130px 80px 110px 1fr 148px 120px", alignItems: "center", borderBottom: `1px solid ${isNMC ? "#3a1010" : "#1a1a28"}`, background: isNMC ? "rgba(255,40,40,0.06)" : "transparent", minHeight: 42 }}>
       <div style={{ ...cell, textAlign: "center", color: "#4a4a6a", fontSize: 11 }}>{row.line}</div>
-      <div style={{ ...cell, color: sc.text, fontWeight: 700, fontSize: 13, letterSpacing: 1 }}>{row.unit}</div>
+      <div style={{ ...cell, color: sc.text, fontWeight: 700, fontSize: 13, letterSpacing: 1, display: "flex", alignItems: "center", gap: 4 }}>
+        {row.unit}
+        {row.jbcp && <span title="JBCP equipped" style={{ fontSize: 11 }}>📡</span>}
+      </div>
       <div style={{ ...cell, color: TYPE_COLOR[row.type] || "#5a5a7a", fontSize: 10, fontWeight: 700 }}>{row.type}</div>
       <div style={{ ...cell }}>
         {editing === "squad" && !isViewer
@@ -318,17 +327,16 @@ const DesktopRow = memo(function DesktopRow({ row, onUpdate, username, editingRo
   );
 });
 
-// ── DASHBOARD ─────────────────────────────────────────────────────────────────
 function Dashboard({ rows, isMobile }) {
   const total = rows.length;
-  const fmc   = rows.filter(r => r.status === "FMC").length;
-  const nmc   = rows.filter(r => r.status === "NMC").length;
-  const pct   = total ? Math.round((fmc / total) * 100) : 0;
+  const fmc = rows.filter(r => r.status === "FMC").length;
+  const nmc = rows.filter(r => r.status === "NMC").length;
+  const pct = total ? Math.round((fmc / total) * 100) : 0;
 
-  const bySquad    = ["1SQD","2SQD","3SQD","4SQD"].map(sq => { const s = rows.filter(r => r.squad === sq); return { sq, total: s.length, fmc: s.filter(r=>r.status==="FMC").length, nmc: s.filter(r=>r.status==="NMC").length }; });
-  const byType     = ["PLS","TRAILER","LMTV TRL","MATV","LMTV","PO5025"].map(t => { const s = rows.filter(r => r.type === t); return { t, total: s.length, fmc: s.filter(r=>r.status==="FMC").length, nmc: s.filter(r=>r.status==="NMC").length }; }).filter(x => x.total > 0);
+  const bySquad = ["1SQD","2SQD","3SQD","4SQD"].map(sq => { const s = rows.filter(r => r.squad === sq); return { sq, total: s.length, fmc: s.filter(r=>r.status==="FMC").length, nmc: s.filter(r=>r.status==="NMC").length }; });
+  const byType = ["PLS","TRAILER","LMTV TRL","MATV","LMTV","PO5025"].map(t => { const s = rows.filter(r => r.type === t); return { t, total: s.length, fmc: s.filter(r=>r.status==="FMC").length, nmc: s.filter(r=>r.status==="NMC").length }; }).filter(x => x.total > 0);
   const byLocation = LOCATIONS.map(l => { const s = rows.filter(r => r.location === l); return { l, total: s.length, fmc: s.filter(r=>r.status==="FMC").length, nmc: s.filter(r=>r.status==="NMC").length, cfg: LOCATION_CONFIG[l] }; }).filter(x => x.total > 0);
-  const nmcList    = rows.filter(r => r.status === "NMC").sort((a,b) => { const da = new Date(a.nmc_since||0); const db = new Date(b.nmc_since||0); return da - db; });
+  const nmcList = rows.filter(r => r.status === "NMC").sort((a,b) => { const da = new Date(a.nmc_since||0); const db = new Date(b.nmc_since||0); return da - db; });
 
   const card = (title, value, color, sub) => (
     <div style={{ background: "#0e0e1c", border: `1px solid ${color}33`, borderRadius: 10, padding: "16px 20px", flex: 1, minWidth: isMobile ? "calc(50% - 6px)" : 120 }}>
@@ -414,7 +422,7 @@ function Dashboard({ rows, isMobile }) {
         <div style={{ fontSize: 10, color: "#cc0000", letterSpacing: 3, marginBottom: 10 }}>⚠ NMC UNITS — SORTED BY TIME DOWN ({nmcList.length})</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
           {nmcList.map(u => {
-            const dur   = nmcDuration(u.nmc_since);
+            const dur = nmcDuration(u.nmc_since);
             const color = nmcColor(u.nmc_since);
             return (
               <div key={u.id} style={{ background: "rgba(204,0,0,0.06)", border: "1px solid #3a1010", borderRadius: 8, padding: "8px 14px", display: "flex", alignItems: "flex-start", gap: 10, flexWrap: "wrap" }}>
@@ -434,27 +442,26 @@ function Dashboard({ rows, isMobile }) {
   );
 }
 
-// ── HISTORY ───────────────────────────────────────────────────────────────────
 function History({ isMobile }) {
-  const [logs,       setLogs]       = useState([]);
-  const [loading,    setLoading]    = useState(true);
-  const [loadError,  setLoadError]  = useState(false);
-  const [page,       setPage]       = useState(0);
-  const [hasMore,    setHasMore]    = useState(true);
+  const [logs, setLogs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
   const [filterUnit, setFilterUnit] = useState("");
-  const [dateFrom,   setDateFrom]   = useState("");
-  const [dateTo,     setDateTo]     = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
 
   const fetchPage = useCallback(async (pageNum, unit, from, to) => {
     setLoading(true); setLoadError(false);
     let query = supabase.from("fleet_history").select("*").order("changed_at", { ascending: false });
     if (unit) query = query.ilike("unit", `%${unit}%`);
     if (from) query = query.gte("changed_at", new Date(from).toISOString());
-    if (to)   query = query.lte("changed_at", new Date(to + "T23:59:59").toISOString());
-    query = query.range(pageNum * HISTORY_PAGE_SIZE, (pageNum + 1) * HISTORY_PAGE_SIZE - 1);
+    if (to) query = query.lte("changed_at", new Date(to + "T23:59:59").toISOString());
+    query = query.range(pageNum * PAGE_SIZE, (pageNum + 1) * PAGE_SIZE - 1);
     const { data, error } = await query;
     if (error) { setLoadError(true); setLoading(false); return; }
-    if (data.length < HISTORY_PAGE_SIZE) setHasMore(false);
+    if (data.length < PAGE_SIZE) setHasMore(false);
     else setHasMore(true);
     setLogs(prev => pageNum === 0 ? data : [...prev, ...data]);
     setLoading(false);
@@ -476,7 +483,7 @@ function History({ isMobile }) {
   const fieldColor = (f) => ({ status: "#00aaff", faults: "#ff6600", location: "#cc44ff", squad: "#ffcc00" }[f] || "#888");
 
   const clearFilters = () => { setFilterUnit(""); setDateFrom(""); setDateTo(""); };
-  const hasFilters   = filterUnit || dateFrom || dateTo;
+  const hasFilters = filterUnit || dateFrom || dateTo;
 
   return (
     <div style={{ padding: isMobile ? "12px" : "24px" }}>
@@ -514,8 +521,8 @@ function History({ isMobile }) {
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
         {logs.map(log => {
           const date = new Date(log.changed_at);
-          const ts   = `${date.getMonth()+1}/${date.getDate()}/${date.getFullYear()} ${date.toLocaleTimeString("en-US",{hour12:false})}`;
-          const fc   = fieldColor(log.field_changed);
+          const ts = `${date.getMonth()+1}/${date.getDate()}/${date.getFullYear()} ${date.toLocaleTimeString("en-US",{hour12:false})}`;
+          const fc = fieldColor(log.field_changed);
           return (
             <div key={log.id} style={{ background: "#0c0c16", border: "1px solid #1a2a1a", borderRadius: 8, padding: "10px 14px", display: "flex", alignItems: "flex-start", gap: 10, flexWrap: "wrap" }}>
               <span style={{ color: "#00ff6a", fontFamily: "monospace", fontWeight: 900, fontSize: 13, minWidth: 60 }}>{log.unit}</span>
@@ -542,7 +549,6 @@ function History({ isMobile }) {
   );
 }
 
-// ── LOCATION BREAKDOWN ────────────────────────────────────────────────────────
 function LocationBreakdown({ rows, isMobile }) {
   const grouped = {};
   LOCATIONS.forEach(l => { grouped[l] = []; });
@@ -574,7 +580,7 @@ function LocationBreakdown({ rows, isMobile }) {
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         {active.map(loc => {
-          const lcfg  = LOCATION_CONFIG[loc] || { color: "#888", icon: "📍", desc: loc };
+          const lcfg = LOCATION_CONFIG[loc] || { color: "#888", icon: "📍", desc: loc };
           const units = grouped[loc];
           const byType = TYPES.map(t => ({ t, items: units.filter(u => u.type === t) })).filter(x => x.items.length > 0);
           return (
@@ -599,6 +605,7 @@ function LocationBreakdown({ rows, isMobile }) {
                         return (
                           <div key={unit.id} style={{ display: "flex", alignItems: "center", gap: 8, background: sc.bg, border: `1px solid ${sc.badge}33`, borderRadius: 6, padding: "8px 10px", flexWrap: "wrap" }}>
                             <span style={{ fontFamily: "monospace", fontWeight: 900, fontSize: 13, color: sc.text, minWidth: 54 }}>{unit.unit}</span>
+                            {unit.jbcp && <span title="JBCP equipped" style={{ fontSize: 11 }}>📡</span>}
                             <StatusBadge status={unit.status} />
                             <span style={{ fontSize: 10, color: "#5a5a7a", fontFamily: "monospace" }}>{unit.squad}</span>
                             {unit.status === "NMC" && <NmcTimer nmcSince={unit.nmc_since} />}
@@ -618,15 +625,13 @@ function LocationBreakdown({ rows, isMobile }) {
   );
 }
 
-
-// ── SQUAD VIEW ────────────────────────────────────────────────────────────────
-function SquadView({ rows, isMobile, onUpdate, username, editingRowId, isViewer }) {
+function SquadView({ rows, isMobile, onUpdate, username, editingId, isViewer }) {
   const [selectedSquad, setSelectedSquad] = useState(null);
 
   const squadData = ["1SQD","2SQD","3SQD","4SQD"].map(sq => {
     const units = rows.filter(r => r.squad === sq);
-    const fmc   = units.filter(r => r.status === "FMC").length;
-    const nmc   = units.filter(r => r.status === "NMC").length;
+    const fmc = units.filter(r => r.status === "FMC").length;
+    const nmc = units.filter(r => r.status === "NMC").length;
     return { sq, units, fmc, nmc, total: units.length };
   });
 
@@ -678,7 +683,7 @@ function SquadView({ rows, isMobile, onUpdate, username, editingRowId, isViewer 
               <div style={{ fontSize: 10, color: "#cc0000", letterSpacing: 2, marginBottom: 8 }}>⚠ NMC UNITS ({selected.nmc})</div>
               <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                 {selected.units.filter(u => u.status === "NMC").map(u => {
-                  const dur   = nmcDuration(u.nmc_since);
+                  const dur = nmcDuration(u.nmc_since);
                   const color = nmcColor(u.nmc_since);
                   return (
                     <div key={u.id} style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
@@ -706,7 +711,7 @@ function SquadView({ rows, isMobile, onUpdate, username, editingRowId, isViewer 
                 </div>
                 <div style={{ display: "flex", flexDirection: "column" }}>
                   {items.map(unit => (
-                    <MobileCard key={unit.id} row={unit} onUpdate={onUpdate} username={username} editingRowId={editingRowId} isViewer={isViewer} />
+                    <MobileCard key={unit.id} row={unit} onUpdate={onUpdate} username={username} editingId={editingId} isViewer={isViewer} />
                   ))}
                 </div>
               </div>
@@ -724,27 +729,26 @@ function SquadView({ rows, isMobile, onUpdate, username, editingRowId, isViewer 
   );
 }
 
-// ── MAIN APP ──────────────────────────────────────────────────────────────────
 export default function ShadowTracker() {
-  const [role,         setRole]         = useState(() => sessionStorage.getItem("shadow-role") || null);
-  const [rows,         setRows]         = useState([]);
-  const [loading,      setLoading]      = useState(true);
-  const [loadError,    setLoadError]    = useState(false);
-  const [username,     setUsername]     = useState(() => localStorage.getItem("shadow-username") || "");
-  const [tab,          setTab]          = useState("tracker");
+  const [role, setRole] = useState(() => sessionStorage.getItem("shadow-role") || null);
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [username, setUsername] = useState(() => localStorage.getItem("shadow-username") || "");
+  const [tab, setTab] = useState("tracker");
   const [filterStatus, setFilterStatus] = useState("ALL");
-  const [filterType,   setFilterType]   = useState("ALL");
-  const [search,       setSearch]       = useState("");
-  const [showPrompt,   setShowPrompt]   = useState(!localStorage.getItem("shadow-username"));
-  const [nameInput,    setNameInput]    = useState("");
-  const [isMobile,     setIsMobile]     = useState(window.innerWidth < 768);
-  const [online,       setOnline]       = useState(true);
+  const [filterType, setFilterType] = useState("ALL");
+  const [search, setSearch] = useState("");
+  const [showPrompt, setShowPrompt] = useState(!localStorage.getItem("shadow-username"));
+  const [nameInput, setNameInput] = useState("");
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [online, setOnline] = useState(true);
   const [pendingCount, setPendingCount] = useState(loadQueue().length);
 
-  const isViewer     = role === "viewer";
-  const editingRowId = useRef(null);
-  const realtimeOk   = useRef(false);
-  const pollRef      = useRef(null);
+  const isViewer = role === "viewer";
+  const editingId = useRef(null);
+  const realtimeOk = useRef(false);
+  const pollRef = useRef(null);
 
   const handleAuth = (r) => {
     setRole(r);
@@ -760,6 +764,7 @@ export default function ShadowTracker() {
     return () => window.removeEventListener("resize", handle);
   }, []);
 
+  // retry anything that failed to save while offline
   const flushQueue = useCallback(async () => {
     const queue = loadQueue();
     if (!queue.length) return;
@@ -779,7 +784,7 @@ export default function ShadowTracker() {
       if (error) { setLoadError(true); setLoading(false); setOnline(false); return; }
       setOnline(true); setLoadError(false);
       setRows(prev => data.map(serverRow => {
-        if (editingRowId.current === serverRow.id) return prev.find(r => r.id === serverRow.id) || serverRow;
+        if (editingId.current === serverRow.id) return prev.find(r => r.id === serverRow.id) || serverRow;
         return serverRow;
       }));
       setLoading(false);
@@ -789,7 +794,7 @@ export default function ShadowTracker() {
 
     const channel = supabase.channel("fleet-realtime", { config: { broadcast: { self: false } } })
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "fleet" }, payload => {
-        if (editingRowId.current === payload.new.id) return;
+        if (editingId.current === payload.new.id) return;
         setRows(prev => prev.map(r => r.id === payload.new.id ? payload.new : r));
       })
       .subscribe(status => {
@@ -799,14 +804,14 @@ export default function ShadowTracker() {
         pollRef.current = setInterval(fetchRows, status === "SUBSCRIBED" ? 15000 : 8000);
       });
 
-    const goOnline  = () => { setOnline(true);  fetchRows(); };
+    const goOnline = () => { setOnline(true); fetchRows(); };
     const goOffline = () => setOnline(false);
-    window.addEventListener("online",  goOnline);
+    window.addEventListener("online", goOnline);
     window.addEventListener("offline", goOffline);
     return () => {
       supabase.removeChannel(channel);
       if (pollRef.current) clearInterval(pollRef.current);
-      window.removeEventListener("online",  goOnline);
+      window.removeEventListener("online", goOnline);
       window.removeEventListener("offline", goOffline);
     };
   }, [role, flushQueue]);
@@ -814,9 +819,8 @@ export default function ShadowTracker() {
   const handleUpdate = useCallback(async (row, field, value, ts, user) => {
     if (isViewer) return false;
     const oldValue = row[field] || "";
-    const changes  = { [field]: value, last_updated: ts, updated_by: user };
-    // If changing to NMC, record the start time
-    if (field === "status" && value === "NMC") changes.nmc_since = ts;
+    const changes = { [field]: value, last_updated: ts, updated_by: user };
+    if (field === "status" && value === "NMC") changes.nmc_since = ts; // starts the down-time clock
     if (field === "status" && value === "FMC") changes.nmc_since = "";
     setRows(prev => prev.map(r => r.id === row.id ? { ...r, ...changes } : r));
     try {
@@ -832,29 +836,31 @@ export default function ShadowTracker() {
     }
   }, [isViewer]);
 
+  // TODO: hook up real auth eventually, this works for now
   const commitName = () => {
     const n = nameInput.trim().toUpperCase() || "OPERATOR";
-    setUsername(n); localStorage.setItem("shadow-username", n); setShowPrompt(false);
+    setUsername(n);
+    localStorage.setItem("shadow-username", n);
+    setShowPrompt(false);
   };
 
-  // Show PIN screen if not authenticated
   if (!role) return <PinScreen onAuth={handleAuth} />;
 
   const filtered = rows.filter(r => {
     if (filterStatus !== "ALL" && r.status !== filterStatus) return false;
-    if (filterType   !== "ALL" && r.type   !== filterType)   return false;
+    if (filterType !== "ALL" && r.type !== filterType) return false;
     if (search && !r.unit.includes(search.toUpperCase()) && !r.faults?.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
   });
 
   const stats = { fmc: rows.filter(r=>r.status==="FMC").length, nmc: rows.filter(r=>r.status==="NMC").length, total: rows.length };
-  const hCol  = { fontFamily: "monospace", fontSize: 10, color: "#5a5a7a", letterSpacing: 2, padding: "10px 6px" };
-  const TABS  = [
-    { id: "tracker",   icon: "📋", label: isMobile ? "TRACKER"   : "TRACKER" },
-    { id: "squads",    icon: "🪖", label: isMobile ? "SQUADS"    : "SQUAD VIEW" },
+  const hCol = { fontFamily: "monospace", fontSize: 10, color: "#5a5a7a", letterSpacing: 2, padding: "10px 6px" };
+  const TABS = [
+    { id: "tracker", icon: "📋", label: isMobile ? "TRACKER" : "TRACKER" },
+    { id: "squads", icon: "🪖", label: isMobile ? "SQUADS" : "SQUAD VIEW" },
     { id: "locations", icon: "📍", label: isMobile ? "LOCATIONS" : "LOCATION BREAKDOWN" },
-    { id: "dashboard", icon: "📊", label: isMobile ? "DASH"      : "DASHBOARD" },
-    { id: "history",   icon: "🕐", label: isMobile ? "LOG"       : "CHANGE LOG" },
+    { id: "dashboard", icon: "📊", label: isMobile ? "DASH" : "DASHBOARD" },
+    { id: "history", icon: "🕐", label: isMobile ? "LOG" : "CHANGE LOG" },
   ];
 
   if (loading) return (
@@ -925,7 +931,7 @@ export default function ShadowTracker() {
           <div style={{ width: 8, height: 8, borderRadius: "50%", background: online ? "#88aaff" : "#cc0000", boxShadow: online ? "0 0 6px #88aaff" : "0 0 6px #cc0000", transition: "all 0.3s" }} />
           <span style={{ fontSize: 10, color: online ? "#88aaff" : "#cc0000", letterSpacing: 1 }}>{online ? "LIVE" : "OFFLINE"}</span>
           {!isViewer && <span style={{ fontSize: 11, color: "#c8c8d8", fontWeight: 700, cursor: "pointer", marginLeft: 4 }} onClick={() => setShowPrompt(true)}>{username || "—"}</span>}
-          {isViewer  && <span style={{ fontSize: 11, color: "#8888cc", fontWeight: 700, marginLeft: 4 }}>👁 VIEWER</span>}
+          {isViewer && <span style={{ fontSize: 11, color: "#8888cc", fontWeight: 700, marginLeft: 4 }}>👁 VIEWER</span>}
         </div>
       </div>
 
@@ -953,7 +959,7 @@ export default function ShadowTracker() {
         </div>
 
         {!isMobile && (
-          <div style={{ display: "grid", gridTemplateColumns: "36px 80px 72px 72px 130px 80px 110px 1fr 148px 120px", background: "#08080f", borderBottom: "1px solid #1a3a1a", position: "sticky", top: 0, zIndex: 10 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "36px 95px 72px 72px 130px 80px 110px 1fr 148px 120px", background: "#08080f", borderBottom: "1px solid #1a3a1a", position: "sticky", top: 0, zIndex: 10 }}>
             {["#","UNIT","TYPE","SQUAD","LOCATION","STATUS","TIME DOWN","FAULTS / DETAILS","LAST UPDATED","UPDATED BY"].map((h, i) => (
               <div key={i} style={{ ...hCol, textAlign: i===0?"center":"left" }}>{h}</div>
             ))}
@@ -962,17 +968,17 @@ export default function ShadowTracker() {
 
         <div style={{ paddingBottom: isMobile ? 80 : 0 }}>
           {filtered.map(row => isMobile
-            ? <MobileCard key={row.id} row={row} onUpdate={handleUpdate} username={username} editingRowId={editingRowId} isViewer={isViewer} />
-            : <DesktopRow key={row.id} row={row} onUpdate={handleUpdate} username={username} editingRowId={editingRowId} isViewer={isViewer} />
+            ? <MobileCard key={row.id} row={row} onUpdate={handleUpdate} username={username} editingId={editingId} isViewer={isViewer} />
+            : <DesktopRow key={row.id} row={row} onUpdate={handleUpdate} username={username} editingId={editingId} isViewer={isViewer} />
           )}
           {filtered.length === 0 && <div style={{ textAlign: "center", padding: 48, color: "#3a3a5a", letterSpacing: 3 }}>NO RECORDS MATCH</div>}
         </div>
       </>}
 
-      {tab === "dashboard"  && <Dashboard rows={rows} isMobile={isMobile} />}
-      {tab === "squads"     && <SquadView rows={rows} isMobile={isMobile} onUpdate={handleUpdate} username={username} editingRowId={editingRowId} isViewer={isViewer} />}
-      {tab === "locations"  && <LocationBreakdown rows={rows} isMobile={isMobile} />}
-      {tab === "history"    && <History isMobile={isMobile} />}
+      {tab === "dashboard" && <Dashboard rows={rows} isMobile={isMobile} />}
+      {tab === "squads" && <SquadView rows={rows} isMobile={isMobile} onUpdate={handleUpdate} username={username} editingId={editingId} isViewer={isViewer} />}
+      {tab === "locations" && <LocationBreakdown rows={rows} isMobile={isMobile} />}
+      {tab === "history" && <History isMobile={isMobile} />}
     </div>
   );
 }
