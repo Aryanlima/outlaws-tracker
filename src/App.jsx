@@ -738,6 +738,7 @@ export default function ShadowTracker() {
   const [tab, setTab] = useState("tracker");
   const [filterStatus, setFilterStatus] = useState("ALL");
   const [filterType, setFilterType] = useState("ALL");
+  const [jbcpOnly, setJbcpOnly] = useState(false);
   const [search, setSearch] = useState("");
   const [showPrompt, setShowPrompt] = useState(!localStorage.getItem("shadow-username"));
   const [nameInput, setNameInput] = useState("");
@@ -849,6 +850,7 @@ export default function ShadowTracker() {
   const filtered = rows.filter(r => {
     if (filterStatus !== "ALL" && r.status !== filterStatus) return false;
     if (filterType !== "ALL" && r.type !== filterType) return false;
+    if (jbcpOnly && !r.jbcp) return false;
     if (search && !r.unit.includes(search.toUpperCase()) && !r.faults?.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
   });
@@ -954,6 +956,8 @@ export default function ShadowTracker() {
           {["ALL","PLS","TRAILER","LMTV TRL","MATV","LMTV","PO5025"].map(t => (
             <button key={t} onClick={() => setFilterType(t)} style={{ background: filterType===t ? "#1e1e2e" : "#0e0e1c", color: filterType===t ? (TYPE_COLOR[t]||"#a0a0c0") : "#4a6a4a", border: "1px solid #2a4a2a", borderRadius: 4, padding: "5px 10px", fontFamily: "monospace", fontSize: 11, cursor: "pointer", fontWeight: filterType===t?700:400 }}>{t}</button>
           ))}
+          <div style={{ width: 1, background: "#1e1e2e", height: 22 }} />
+          <button onClick={() => setJbcpOnly(!jbcpOnly)} style={{ background: jbcpOnly ? "#00ffaa" : "#0e0e1c", color: jbcpOnly ? "#000" : "#00ffaa", border: "1px solid #00ffaa66", borderRadius: 4, padding: "5px 10px", fontFamily: "monospace", fontSize: 11, cursor: "pointer", fontWeight: jbcpOnly ? 700 : 400 }}>📡 JBCP</button>
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search..." style={{ ...inputStyle, flex: 1, minWidth: 80, maxWidth: 200, fontSize: 12 }} />
           <span style={{ fontSize: 10, color: "#3a3a5a" }}>{filtered.length}</span>
         </div>
