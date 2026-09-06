@@ -1,11 +1,12 @@
 {
-  "name": "outlaws-tracker",
+  "name": "shadow-tracker",
   "version": "1.0.0",
   "private": true,
   "dependencies": {
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "@supabase/supabase-js": "^2.39.0"
+    "@supabase/supabase-js": "^2.39.0",
+    "jspdf": "^2.5.1"
   },
   "devDependencies": {
     "vite": "^5.0.0",
