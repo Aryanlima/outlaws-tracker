@@ -1,5 +1,8 @@
 import { useState, useEffect, useRef, useCallback, memo } from "react";
+import jsPDF from "jspdf";
 import { supabase } from "./supabase.js";
+
+const FONT_HEAD = "'Arial Black', 'Helvetica Neue', Arial, sans-serif";
 
 const SQUADS = ["1SQD", "2SQD", "3SQD", "4SQD"];
 const LOCATIONS = ["AMP", "BMP", "CMP", "MAINTENANCE BAY", "MISSION", "WARRIOR LUBE"];
@@ -59,6 +62,57 @@ function nmcColor(nmcSince) {
   return "#ffcc44";
 }
 
+function exportPDF(rows) {
+  const doc = new jsPDF();
+  const fmc = rows.filter(r => r.status === "FMC").length;
+  const nmc = rows.filter(r => r.status === "NMC").length;
+  const pct = rows.length ? Math.round((fmc / rows.length) * 100) : 0;
+
+  doc.setFontSize(16);
+  doc.text("SHADOW PLATOON - FLEET STATUS REPORT", 14, 18);
+  doc.setFontSize(9);
+  doc.setTextColor(100);
+  doc.text(new Date().toLocaleString(), 14, 24);
+  doc.setFontSize(11);
+  doc.setTextColor(0);
+  doc.text(`Total ${rows.length}   FMC ${fmc}   NMC ${nmc}   Operational ${pct}%`, 14, 33);
+
+  let y = 44;
+  doc.setFontSize(8);
+  doc.setFont(undefined, "bold");
+  doc.text("UNIT", 14, y);
+  doc.text("TYPE", 42, y);
+  doc.text("SQD", 68, y);
+  doc.text("LOC", 86, y);
+  doc.text("STATUS", 106, y);
+  doc.text("DOWN", 128, y);
+  doc.text("FAULTS", 148, y);
+  doc.setFont(undefined, "normal");
+  y += 3;
+  doc.line(14, y, 196, y);
+  y += 6;
+
+  const sorted = [...rows].sort((a, b) => (a.status === "NMC" ? 0 : 1) - (b.status === "NMC" ? 0 : 1));
+
+  sorted.forEach(r => {
+    if (y > 285) { doc.addPage(); y = 18; }
+    doc.setTextColor(0);
+    doc.text(r.unit || "", 14, y);
+    doc.text(r.type || "", 42, y);
+    doc.text(r.squad || "", 68, y);
+    doc.text(r.location || "", 86, y);
+    doc.setTextColor(r.status === "NMC" ? 200 : 0, r.status === "NMC" ? 0 : 140, 0);
+    doc.text(r.status || "", 106, y);
+    doc.setTextColor(90);
+    doc.text(nmcDuration(r.nmc_since) || "-", 128, y);
+    doc.setTextColor(0);
+    doc.text((r.faults || "-").slice(0, 40), 148, y);
+    y += 6;
+  });
+
+  doc.save(`shadow-fleet-report-${new Date().toISOString().slice(0,10)}.pdf`);
+}
+
 function PinScreen({ onAuth }) {
   const [pin, setPin] = useState("");
   const [error, setError] = useState("");
@@ -87,7 +141,7 @@ function PinScreen({ onAuth }) {
     <div style={{ minHeight: "100vh", background: "#08080f", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
       <div style={{ background: "#0e0e1c", border: "1px solid #2a4a2a", borderRadius: 16, padding: 32, textAlign: "center", maxWidth: 320, width: "100%" }}>
         <div style={{ fontSize: 36, marginBottom: 8 }}>☠</div>
-        <div style={{ fontSize: 20, fontWeight: 900, color: "#c8c8d8", letterSpacing: 4, marginBottom: 4 }}>SHADOW</div>
+        <div style={{ fontSize: 22, fontWeight: 900, color: "#c8c8d8", letterSpacing: 4, marginBottom: 4, fontFamily: FONT_HEAD }}>SHADOW</div>
         <div style={{ fontSize: 10, color: "#5a5a7a", letterSpacing: 3, marginBottom: 24 }}>MAINTENANCE TRACKER</div>
 
         {/* Role selector */}
@@ -136,7 +190,8 @@ function PinScreen({ onAuth }) {
 
 function StatusBadge({ status }) {
   const cfg = STATUS_CONFIG[status] || STATUS_CONFIG.FMC;
-  return <span style={{ background: cfg.badge, color: "#fff", fontFamily: "monospace", fontWeight: 900, fontSize: 12, letterSpacing: 2, padding: "4px 12px", borderRadius: 4, display: "inline-block", minWidth: 50, textAlign: "center" }}>{status || "FMC"}</span>;
+  const isNmc = status === "NMC";
+  return <span style={{ background: cfg.badge, color: "#fff", fontFamily: "monospace", fontWeight: 900, fontSize: 12, letterSpacing: 2, padding: "4px 12px", borderRadius: 4, display: "inline-block", minWidth: 50, textAlign: "center", animation: isNmc ? "nmcPulse 1.8s ease-in-out infinite" : "none" }}>{status || "FMC"}</span>;
 }
 
 function NmcTimer({ nmcSince }) {
@@ -155,7 +210,7 @@ function SaveError({ onRetry }) {
   );
 }
 
-const MobileCard = memo(function MobileCard({ row, onUpdate, username, editingId, isViewer }) {
+const MobileCard = memo(function MobileCard({ row, onUpdate, username, editingId, isViewer, onSelectUnit }) {
   const [editing, setEditing] = useState(null);
   const [localStatus, setLocalStatus] = useState(row.status);
   const [localFaults, setLocalFaults] = useState(row.faults);
@@ -198,7 +253,7 @@ const MobileCard = memo(function MobileCard({ row, onUpdate, username, editingId
     <div style={{ background: isNMC ? "rgba(255,30,30,0.07)" : "#0c0c16", border: `1px solid ${isNMC ? "#4a1010" : "#1a1a28"}`, borderRadius: 10, margin: "8px 12px", padding: "12px 14px", opacity: isViewer ? 0.95 : 1 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
         <span style={{ color: "#4a4a6a", fontSize: 11, fontFamily: "monospace", minWidth: 20 }}>{row.line}</span>
-        <span style={{ color: sc.text, fontWeight: 900, fontSize: 16, fontFamily: "monospace", letterSpacing: 1 }}>{row.unit}</span>
+        <span onClick={() => onSelectUnit && onSelectUnit(row.unit)} style={{ color: sc.text, fontWeight: 900, fontSize: 16, fontFamily: "monospace", letterSpacing: 1, cursor: onSelectUnit ? "pointer" : "default", textDecoration: onSelectUnit ? "underline dotted" : "none", textUnderlineOffset: 3 }}>{row.unit}</span>
         {row.jbcp && <span title="JBCP equipped" style={{ fontSize: 13 }}>📡</span>}
         <span style={{ color: TYPE_COLOR[row.type] || "#5a5a7a", fontSize: 10, fontFamily: "monospace", background: "#131320", padding: "2px 8px", borderRadius: 4, fontWeight: 700 }}>{row.type}</span>
         <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6 }}>
@@ -241,7 +296,7 @@ const MobileCard = memo(function MobileCard({ row, onUpdate, username, editingId
   );
 });
 
-const DesktopRow = memo(function DesktopRow({ row, onUpdate, username, editingId, isViewer }) {
+const DesktopRow = memo(function DesktopRow({ row, onUpdate, username, editingId, isViewer, onSelectUnit }) {
   const [editing, setEditing] = useState(null);
   const [localStatus, setLocalStatus] = useState(row.status);
   const [localFaults, setLocalFaults] = useState(row.faults);
@@ -285,7 +340,7 @@ const DesktopRow = memo(function DesktopRow({ row, onUpdate, username, editingId
     <div style={{ display: "grid", gridTemplateColumns: "36px 95px 72px 72px 130px 80px 110px 1fr 148px 120px", alignItems: "center", borderBottom: `1px solid ${isNMC ? "#3a1010" : "#1a1a28"}`, background: isNMC ? "rgba(255,40,40,0.06)" : "transparent", minHeight: 42 }}>
       <div style={{ ...cell, textAlign: "center", color: "#4a4a6a", fontSize: 11 }}>{row.line}</div>
       <div style={{ ...cell, color: sc.text, fontWeight: 700, fontSize: 13, letterSpacing: 1, display: "flex", alignItems: "center", gap: 4 }}>
-        {row.unit}
+        <span onClick={() => onSelectUnit && onSelectUnit(row.unit)} style={{ cursor: onSelectUnit ? "pointer" : "default", textDecoration: onSelectUnit ? "underline dotted" : "none", textUnderlineOffset: 3 }}>{row.unit}</span>
         {row.jbcp && <span title="JBCP equipped" style={{ fontSize: 11 }}>📡</span>}
       </div>
       <div style={{ ...cell, color: TYPE_COLOR[row.type] || "#5a5a7a", fontSize: 10, fontWeight: 700 }}>{row.type}</div>
@@ -327,7 +382,7 @@ const DesktopRow = memo(function DesktopRow({ row, onUpdate, username, editingId
   );
 });
 
-function Dashboard({ rows, isMobile }) {
+function Dashboard({ rows, isMobile, onSelectUnit }) {
   const total = rows.length;
   const fmc = rows.filter(r => r.status === "FMC").length;
   const nmc = rows.filter(r => r.status === "NMC").length;
@@ -348,7 +403,10 @@ function Dashboard({ rows, isMobile }) {
 
   return (
     <div style={{ padding: isMobile ? "12px" : "24px" }}>
-      <div style={{ fontSize: 11, color: "#4a4a6a", letterSpacing: 3, marginBottom: 20 }}>SHADOW PLATOON · FLEET DASHBOARD</div>
+      <div style={{ display: "flex", alignItems: "center", marginBottom: 20, flexWrap: "wrap", gap: 10 }}>
+        <div style={{ fontSize: 12, color: "#4a4a6a", letterSpacing: 3, fontFamily: FONT_HEAD }}>SHADOW PLATOON · FLEET DASHBOARD</div>
+        <button onClick={() => exportPDF(rows)} style={{ marginLeft: "auto", background: "#0e0e1c", border: "1px solid #2a4a2a", color: "#a0a0c0", fontFamily: "monospace", fontSize: 11, padding: "6px 14px", borderRadius: 6, cursor: "pointer", letterSpacing: 1 }}>📄 EXPORT PDF</button>
+      </div>
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 24 }}>
         {card("TOTAL UNITS", total, "#5a5a7a")}
         {card("FMC", fmc, "#00c44f", `${pct}% operational`)}
@@ -426,7 +484,7 @@ function Dashboard({ rows, isMobile }) {
             const color = nmcColor(u.nmc_since);
             return (
               <div key={u.id} style={{ background: "rgba(204,0,0,0.06)", border: "1px solid #3a1010", borderRadius: 8, padding: "8px 14px", display: "flex", alignItems: "flex-start", gap: 10, flexWrap: "wrap" }}>
-                <span style={{ color: "#ff4444", fontFamily: "monospace", fontWeight: 900, fontSize: 13, minWidth: 60 }}>{u.unit}</span>
+                <span onClick={() => onSelectUnit && onSelectUnit(u.unit)} style={{ color: "#ff4444", fontFamily: "monospace", fontWeight: 900, fontSize: 13, minWidth: 60, cursor: onSelectUnit ? "pointer" : "default", textDecoration: onSelectUnit ? "underline dotted" : "none" }}>{u.unit}</span>
                 <span style={{ color: "#cc4444", fontFamily: "monospace", fontSize: 10, background: "#1a0808", padding: "2px 6px", borderRadius: 3 }}>{u.squad}</span>
                 <span style={{ color: "#ff9900", fontFamily: "monospace", fontSize: 10 }}>{u.location}</span>
                 {dur && <span style={{ color, fontFamily: "monospace", fontSize: 10, fontWeight: 700, background: `${color}22`, padding: "2px 8px", borderRadius: 3 }}>⏱ {dur}</span>}
@@ -487,7 +545,7 @@ function History({ isMobile }) {
 
   return (
     <div style={{ padding: isMobile ? "12px" : "24px" }}>
-      <div style={{ fontSize: 11, color: "#4a4a6a", letterSpacing: 3, marginBottom: 16 }}>CHANGE LOG</div>
+      <div style={{ fontSize: 12, color: "#4a4a6a", letterSpacing: 3, marginBottom: 16, fontFamily: FONT_HEAD }}>CHANGE LOG</div>
 
       {/* Filters */}
       <div style={{ background: "#0c0c16", border: "1px solid #1a2a1a", borderRadius: 10, padding: "14px", marginBottom: 16, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
@@ -549,14 +607,14 @@ function History({ isMobile }) {
   );
 }
 
-function LocationBreakdown({ rows, isMobile }) {
+function LocationBreakdown({ rows, isMobile, onSelectUnit }) {
   const grouped = {};
   LOCATIONS.forEach(l => { grouped[l] = []; });
   rows.forEach(r => { const loc = r.location || "CMP"; if (!grouped[loc]) grouped[loc] = []; grouped[loc].push(r); });
   const active = LOCATIONS.filter(l => grouped[l]?.length > 0);
   return (
     <div style={{ padding: isMobile ? "12px" : "24px" }}>
-      <div style={{ fontSize: 11, color: "#4a4a6a", letterSpacing: 3, marginBottom: 16 }}>LOCATION BREAKDOWN</div>
+      <div style={{ fontSize: 12, color: "#4a4a6a", letterSpacing: 3, marginBottom: 16, fontFamily: FONT_HEAD }}>LOCATION BREAKDOWN</div>
       <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
         {active.map(loc => {
           const lcfg = LOCATION_CONFIG[loc] || { color: "#888", icon: "📍" };
@@ -604,7 +662,7 @@ function LocationBreakdown({ rows, isMobile }) {
                         const sc = STATUS_CONFIG[unit.status] || STATUS_CONFIG.FMC;
                         return (
                           <div key={unit.id} style={{ display: "flex", alignItems: "center", gap: 8, background: sc.bg, border: `1px solid ${sc.badge}33`, borderRadius: 6, padding: "8px 10px", flexWrap: "wrap" }}>
-                            <span style={{ fontFamily: "monospace", fontWeight: 900, fontSize: 13, color: sc.text, minWidth: 54 }}>{unit.unit}</span>
+                            <span onClick={() => onSelectUnit && onSelectUnit(unit.unit)} style={{ fontFamily: "monospace", fontWeight: 900, fontSize: 13, color: sc.text, minWidth: 54, cursor: onSelectUnit ? "pointer" : "default", textDecoration: onSelectUnit ? "underline dotted" : "none", textUnderlineOffset: 3 }}>{unit.unit}</span>
                             {unit.jbcp && <span title="JBCP equipped" style={{ fontSize: 11 }}>📡</span>}
                             <StatusBadge status={unit.status} />
                             <span style={{ fontSize: 10, color: "#5a5a7a", fontFamily: "monospace" }}>{unit.squad}</span>
@@ -625,7 +683,7 @@ function LocationBreakdown({ rows, isMobile }) {
   );
 }
 
-function SquadView({ rows, isMobile, onUpdate, username, editingId, isViewer }) {
+function SquadView({ rows, isMobile, onUpdate, username, editingId, isViewer, onSelectUnit }) {
   const [selectedSquad, setSelectedSquad] = useState(null);
 
   const squadData = ["1SQD","2SQD","3SQD","4SQD"].map(sq => {
@@ -645,7 +703,7 @@ function SquadView({ rows, isMobile, onUpdate, username, editingId, isViewer }) 
 
   return (
     <div style={{ padding: isMobile ? "12px" : "24px" }}>
-      <div style={{ fontSize: 11, color: "#4a4a6a", letterSpacing: 3, marginBottom: 20 }}>SQUAD BREAKDOWN</div>
+      <div style={{ fontSize: 12, color: "#4a4a6a", letterSpacing: 3, marginBottom: 20, fontFamily: FONT_HEAD }}>SQUAD BREAKDOWN</div>
 
       {/* Squad selector cards */}
       <div style={{ display: "flex", gap: 10, marginBottom: 24, flexWrap: "wrap" }}>
@@ -655,7 +713,7 @@ function SquadView({ rows, isMobile, onUpdate, username, editingId, isViewer }) 
           return (
             <div key={sq} onClick={() => setSelectedSquad(isSelected ? null : sq)}
               style={{ background: isSelected ? "#14141e" : "#0e0e1c", border: `2px solid ${isSelected ? "#00ff6a" : "#1e1e2e"}`, borderRadius: 12, padding: "16px 20px", flex: 1, minWidth: isMobile ? "calc(50% - 5px)" : 160, cursor: "pointer", transition: "all 0.2s" }}>
-              <div style={{ fontSize: 20, fontWeight: 900, color: isSelected ? "#00ff6a" : "#a0a0c0", fontFamily: "monospace", letterSpacing: 3, marginBottom: 10 }}>{sq}</div>
+              <div style={{ fontSize: 20, fontWeight: 900, color: isSelected ? "#00ff6a" : "#a0a0c0", fontFamily: FONT_HEAD, letterSpacing: 3, marginBottom: 10 }}>{sq}</div>
               <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
                 <span style={{ background: "#00c44f", color: "#000", fontSize: 11, fontWeight: 900, padding: "3px 10px", borderRadius: 4 }}>FMC {fmc}</span>
                 {nmc > 0 && <span style={{ background: "#cc0000", color: "#fff", fontSize: 11, fontWeight: 900, padding: "3px 10px", borderRadius: 4 }}>NMC {nmc}</span>}
@@ -687,7 +745,7 @@ function SquadView({ rows, isMobile, onUpdate, username, editingId, isViewer }) 
                   const color = nmcColor(u.nmc_since);
                   return (
                     <div key={u.id} style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                      <span style={{ color: "#ff4444", fontFamily: "monospace", fontWeight: 900, fontSize: 13, minWidth: 60 }}>{u.unit}</span>
+                      <span onClick={() => onSelectUnit && onSelectUnit(u.unit)} style={{ color: "#ff4444", fontFamily: "monospace", fontWeight: 900, fontSize: 13, minWidth: 60, cursor: onSelectUnit ? "pointer" : "default", textDecoration: onSelectUnit ? "underline dotted" : "none" }}>{u.unit}</span>
                       <span style={{ color: TYPE_COLOR[u.type] || "#888", fontFamily: "monospace", fontSize: 10, fontWeight: 700 }}>{u.type}</span>
                       {dur && <span style={{ color, fontFamily: "monospace", fontSize: 10, fontWeight: 700 }}>⏱ {dur}</span>}
                       <span style={{ color: "#ff6666", fontFamily: "monospace", fontSize: 11, flex: 1 }}>{u.faults || "—"}</span>
@@ -711,7 +769,7 @@ function SquadView({ rows, isMobile, onUpdate, username, editingId, isViewer }) 
                 </div>
                 <div style={{ display: "flex", flexDirection: "column" }}>
                   {items.map(unit => (
-                    <MobileCard key={unit.id} row={unit} onUpdate={onUpdate} username={username} editingId={editingId} isViewer={isViewer} />
+                    <MobileCard key={unit.id} row={unit} onUpdate={onUpdate} username={username} editingId={editingId} isViewer={isViewer} onSelectUnit={onSelectUnit} />
                   ))}
                 </div>
               </div>
@@ -725,6 +783,61 @@ function SquadView({ rows, isMobile, onUpdate, username, editingId, isViewer }) 
           ↑ TAP A SQUAD TO VIEW ITS VEHICLES
         </div>
       )}
+    </div>
+  );
+}
+
+function UnitHistoryModal({ unit, onClose }) {
+  const [logs, setLogs] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!unit) return;
+    setLoading(true);
+    supabase.from("fleet_history").select("*").eq("unit", unit).order("changed_at", { ascending: false }).limit(100)
+      .then(({ data }) => { setLogs(data || []); setLoading(false); });
+  }, [unit]);
+
+  if (!unit) return null;
+
+  const fieldColor = (f) => ({ status: "#00aaff", faults: "#ff6600", location: "#cc44ff", squad: "#ffcc00" }[f] || "#888");
+  const fieldLabel = (f) => ({ status: "STATUS", faults: "FAULTS", location: "LOCATION", squad: "SQUAD" }[f] || f.toUpperCase());
+
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 998, padding: 16 }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: "#0e0e1c", border: "1px solid #2a4a2a", borderRadius: 14, padding: 24, maxWidth: 480, width: "100%", maxHeight: "80vh", overflowY: "auto", animation: "fadeIn 0.2s ease" }}>
+        <div style={{ display: "flex", alignItems: "center", marginBottom: 16 }}>
+          <div>
+            <div style={{ fontSize: 20, fontWeight: 900, color: "#00ff6a", fontFamily: FONT_HEAD, letterSpacing: 2 }}>{unit}</div>
+            <div style={{ fontSize: 10, color: "#5a5a7a", letterSpacing: 2 }}>FULL HISTORY</div>
+          </div>
+          <span onClick={onClose} style={{ marginLeft: "auto", color: "#6a6a8a", cursor: "pointer", fontSize: 22, lineHeight: 1 }}>×</span>
+        </div>
+
+        {loading && <div style={{ color: "#4a4a6a", fontFamily: "monospace", fontSize: 12, textAlign: "center", padding: 20 }}>LOADING...</div>}
+        {!loading && logs.length === 0 && <div style={{ color: "#3a3a5a", fontFamily: "monospace", fontSize: 12, textAlign: "center", padding: 20 }}>NO HISTORY RECORDED YET</div>}
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {logs.map(log => {
+            const date = new Date(log.changed_at);
+            const ts = `${date.getMonth()+1}/${date.getDate()}/${date.getFullYear()} ${date.toLocaleTimeString("en-US",{hour12:false})}`;
+            return (
+              <div key={log.id} style={{ background: "#0c0c16", border: "1px solid #1a2a1a", borderRadius: 8, padding: "10px 12px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                  <span style={{ color: fieldColor(log.field_changed), fontFamily: "monospace", fontSize: 10, background: "#0e0e1c", padding: "2px 8px", borderRadius: 3, fontWeight: 700 }}>{fieldLabel(log.field_changed)}</span>
+                  <span style={{ color: "#3a3a5a", fontSize: 10, fontFamily: "monospace", marginLeft: "auto" }}>{ts}</span>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                  {log.old_value && <span style={{ color: "#cc0000", fontFamily: "monospace", fontSize: 11, textDecoration: "line-through", opacity: 0.7 }}>{log.old_value}</span>}
+                  {log.old_value && <span style={{ color: "#4a4a6a", fontSize: 12 }}>→</span>}
+                  <span style={{ color: "#a0a0c0", fontFamily: "monospace", fontSize: 11, fontWeight: 700 }}>{log.new_value || "—"}</span>
+                  <span style={{ color: "#5a5a7a", fontFamily: "monospace", fontSize: 10, marginLeft: "auto" }}>{log.changed_by}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }
@@ -745,6 +858,7 @@ export default function ShadowTracker() {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [online, setOnline] = useState(true);
   const [pendingCount, setPendingCount] = useState(loadQueue().length);
+  const [historyUnit, setHistoryUnit] = useState(null);
 
   const isViewer = role === "viewer";
   const editingId = useRef(null);
@@ -880,13 +994,17 @@ export default function ShadowTracker() {
 
   return (
     <div style={{ minHeight: "100vh", background: "#08080f", color: "#a0a0c0", fontFamily: "monospace", overscrollBehavior: "none" }}>
+      <style>{`
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes nmcPulse { 0%, 100% { box-shadow: 0 0 0 rgba(255,40,40,0); } 50% { box-shadow: 0 0 10px rgba(255,40,40,0.55); } }
+      `}</style>
 
       {/* NAME PROMPT — only for editors */}
       {showPrompt && !isViewer && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.92)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 999, padding: 20 }}>
           <div style={{ background: "#0e0e1c", border: "1px solid #2a4a2a", borderRadius: 12, padding: 32, textAlign: "center", maxWidth: 340, width: "100%" }}>
             <div style={{ fontSize: 32, marginBottom: 8 }}>🪖</div>
-            <div style={{ fontSize: 18, fontWeight: 700, color: "#c8c8d8", letterSpacing: 3, marginBottom: 6 }}>SHADOW PLATOON</div>
+            <div style={{ fontSize: 18, fontWeight: 700, color: "#c8c8d8", letterSpacing: 3, marginBottom: 6, fontFamily: FONT_HEAD }}>SHADOW PLATOON</div>
             <div style={{ color: "#6a6a8a", fontSize: 12, marginBottom: 20 }}>Enter your callsign</div>
             <input autoFocus value={nameInput} onChange={e => setNameInput(e.target.value)} onKeyDown={e => e.key === "Enter" && commitName()} placeholder="e.g. 2LT.EVANS" style={{ ...inputStyle, fontSize: 16, textAlign: "center", marginBottom: 14, color: "#00ff6a", letterSpacing: 2, padding: "10px" }} />
             <button onClick={commitName} style={{ background: "#00c44f", color: "#000", border: "none", borderRadius: 6, padding: "12px", fontFamily: "monospace", fontWeight: 700, fontSize: 15, letterSpacing: 2, cursor: "pointer", width: "100%" }}>LOG IN</button>
@@ -918,7 +1036,7 @@ export default function ShadowTracker() {
       {/* HEADER */}
       <div style={{ background: "#0d0d18", borderBottom: "2px solid #1a3a1a", padding: isMobile ? "10px 14px" : "14px 24px", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
         <div>
-          <div style={{ fontSize: isMobile ? 18 : 22, fontWeight: 900, color: "#c8c8d8", letterSpacing: 4 }}>☠ SHADOW</div>
+          <div style={{ fontSize: isMobile ? 18 : 22, fontWeight: 900, color: "#c8c8d8", letterSpacing: 4, fontFamily: FONT_HEAD }}>☠ SHADOW</div>
           <div style={{ fontSize: 9, color: "#6a6a8a", letterSpacing: 3 }}>MAINTENANCE TRACKER</div>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
@@ -946,43 +1064,47 @@ export default function ShadowTracker() {
         ))}
       </div>
 
-      {/* TRACKER TAB */}
-      {tab === "tracker" && <>
-        <div style={{ background: "#0a0a14", borderBottom: "1px solid #1a2a1a", padding: isMobile ? "8px 12px" : "10px 24px", display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
-          {["ALL","FMC","NMC"].map(s => (
-            <button key={s} onClick={() => setFilterStatus(s)} style={{ background: filterStatus===s ? (s==="FMC"?"#00c44f":s==="NMC"?"#cc0000":"#28283a") : "#0e0e1c", color: filterStatus===s?"#fff":"#6a6a8a", border: "1px solid #2a4a2a", borderRadius: 4, padding: "5px 12px", fontFamily: "monospace", fontWeight: 700, fontSize: 12, letterSpacing: 2, cursor: "pointer" }}>{s}</button>
-          ))}
-          <div style={{ width: 1, background: "#1e1e2e", height: 22 }} />
-          {["ALL","PLS","TRAILER","LMTV TRL","MATV","LMTV","PO5025"].map(t => (
-            <button key={t} onClick={() => setFilterType(t)} style={{ background: filterType===t ? "#1e1e2e" : "#0e0e1c", color: filterType===t ? (TYPE_COLOR[t]||"#a0a0c0") : "#4a6a4a", border: "1px solid #2a4a2a", borderRadius: 4, padding: "5px 10px", fontFamily: "monospace", fontSize: 11, cursor: "pointer", fontWeight: filterType===t?700:400 }}>{t}</button>
-          ))}
-          <div style={{ width: 1, background: "#1e1e2e", height: 22 }} />
-          <button onClick={() => setJbcpOnly(!jbcpOnly)} style={{ background: jbcpOnly ? "#00ffaa" : "#0e0e1c", color: jbcpOnly ? "#000" : "#00ffaa", border: "1px solid #00ffaa66", borderRadius: 4, padding: "5px 10px", fontFamily: "monospace", fontSize: 11, cursor: "pointer", fontWeight: jbcpOnly ? 700 : 400 }}>📡 JBCP</button>
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search..." style={{ ...inputStyle, flex: 1, minWidth: 80, maxWidth: 200, fontSize: 12 }} />
-          <span style={{ fontSize: 10, color: "#3a3a5a" }}>{filtered.length}</span>
-        </div>
-
-        {!isMobile && (
-          <div style={{ display: "grid", gridTemplateColumns: "36px 95px 72px 72px 130px 80px 110px 1fr 148px 120px", background: "#08080f", borderBottom: "1px solid #1a3a1a", position: "sticky", top: 0, zIndex: 10 }}>
-            {["#","UNIT","TYPE","SQUAD","LOCATION","STATUS","TIME DOWN","FAULTS / DETAILS","LAST UPDATED","UPDATED BY"].map((h, i) => (
-              <div key={i} style={{ ...hCol, textAlign: i===0?"center":"left" }}>{h}</div>
+      <div key={tab} style={{ animation: "fadeIn 0.2s ease" }}>
+        {/* TRACKER TAB */}
+        {tab === "tracker" && <>
+          <div style={{ background: "#0a0a14", borderBottom: "1px solid #1a2a1a", padding: isMobile ? "8px 12px" : "10px 24px", display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+            {["ALL","FMC","NMC"].map(s => (
+              <button key={s} onClick={() => setFilterStatus(s)} style={{ background: filterStatus===s ? (s==="FMC"?"#00c44f":s==="NMC"?"#cc0000":"#28283a") : "#0e0e1c", color: filterStatus===s?"#fff":"#6a6a8a", border: "1px solid #2a4a2a", borderRadius: 4, padding: "5px 12px", fontFamily: "monospace", fontWeight: 700, fontSize: 12, letterSpacing: 2, cursor: "pointer" }}>{s}</button>
             ))}
+            <div style={{ width: 1, background: "#1e1e2e", height: 22 }} />
+            {["ALL","PLS","TRAILER","LMTV TRL","MATV","LMTV","PO5025"].map(t => (
+              <button key={t} onClick={() => setFilterType(t)} style={{ background: filterType===t ? "#1e1e2e" : "#0e0e1c", color: filterType===t ? (TYPE_COLOR[t]||"#a0a0c0") : "#4a6a4a", border: "1px solid #2a4a2a", borderRadius: 4, padding: "5px 10px", fontFamily: "monospace", fontSize: 11, cursor: "pointer", fontWeight: filterType===t?700:400 }}>{t}</button>
+            ))}
+            <div style={{ width: 1, background: "#1e1e2e", height: 22 }} />
+            <button onClick={() => setJbcpOnly(!jbcpOnly)} style={{ background: jbcpOnly ? "#00ffaa" : "#0e0e1c", color: jbcpOnly ? "#000" : "#00ffaa", border: "1px solid #00ffaa66", borderRadius: 4, padding: "5px 10px", fontFamily: "monospace", fontSize: 11, cursor: "pointer", fontWeight: jbcpOnly ? 700 : 400 }}>📡 JBCP</button>
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search..." style={{ ...inputStyle, flex: 1, minWidth: 80, maxWidth: 200, fontSize: 12 }} />
+            <span style={{ fontSize: 10, color: "#3a3a5a" }}>{filtered.length}</span>
           </div>
-        )}
 
-        <div style={{ paddingBottom: isMobile ? 80 : 0 }}>
-          {filtered.map(row => isMobile
-            ? <MobileCard key={row.id} row={row} onUpdate={handleUpdate} username={username} editingId={editingId} isViewer={isViewer} />
-            : <DesktopRow key={row.id} row={row} onUpdate={handleUpdate} username={username} editingId={editingId} isViewer={isViewer} />
+          {!isMobile && (
+            <div style={{ display: "grid", gridTemplateColumns: "36px 95px 72px 72px 130px 80px 110px 1fr 148px 120px", background: "#08080f", borderBottom: "1px solid #1a3a1a", position: "sticky", top: 0, zIndex: 10 }}>
+              {["#","UNIT","TYPE","SQUAD","LOCATION","STATUS","TIME DOWN","FAULTS / DETAILS","LAST UPDATED","UPDATED BY"].map((h, i) => (
+                <div key={i} style={{ ...hCol, textAlign: i===0?"center":"left" }}>{h}</div>
+              ))}
+            </div>
           )}
-          {filtered.length === 0 && <div style={{ textAlign: "center", padding: 48, color: "#3a3a5a", letterSpacing: 3 }}>NO RECORDS MATCH</div>}
-        </div>
-      </>}
 
-      {tab === "dashboard" && <Dashboard rows={rows} isMobile={isMobile} />}
-      {tab === "squads" && <SquadView rows={rows} isMobile={isMobile} onUpdate={handleUpdate} username={username} editingId={editingId} isViewer={isViewer} />}
-      {tab === "locations" && <LocationBreakdown rows={rows} isMobile={isMobile} />}
-      {tab === "history" && <History isMobile={isMobile} />}
+          <div style={{ paddingBottom: isMobile ? 80 : 0 }}>
+            {filtered.map(row => isMobile
+              ? <MobileCard key={row.id} row={row} onUpdate={handleUpdate} username={username} editingId={editingId} isViewer={isViewer} onSelectUnit={setHistoryUnit} />
+              : <DesktopRow key={row.id} row={row} onUpdate={handleUpdate} username={username} editingId={editingId} isViewer={isViewer} onSelectUnit={setHistoryUnit} />
+            )}
+            {filtered.length === 0 && <div style={{ textAlign: "center", padding: 48, color: "#3a3a5a", letterSpacing: 3 }}>NO RECORDS MATCH</div>}
+          </div>
+        </>}
+
+        {tab === "dashboard" && <Dashboard rows={rows} isMobile={isMobile} onSelectUnit={setHistoryUnit} />}
+        {tab === "squads" && <SquadView rows={rows} isMobile={isMobile} onUpdate={handleUpdate} username={username} editingId={editingId} isViewer={isViewer} onSelectUnit={setHistoryUnit} />}
+        {tab === "locations" && <LocationBreakdown rows={rows} isMobile={isMobile} onSelectUnit={setHistoryUnit} />}
+        {tab === "history" && <History isMobile={isMobile} />}
+      </div>
+
+      <UnitHistoryModal unit={historyUnit} onClose={() => setHistoryUnit(null)} />
     </div>
   );
 }
